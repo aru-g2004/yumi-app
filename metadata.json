@@ -1,0 +1,8 @@
+{
+  "name": "yumi",
+  "description": "A chic 3D collectible studio. Curate your digital shelf with minimalist AI-generated characters, earn credits in the design lab, and animate your collection with professional tools.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
