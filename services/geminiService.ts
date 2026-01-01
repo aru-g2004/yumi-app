@@ -13,7 +13,7 @@ const logUsage = (model: string, operation: string, response: any) => {
 };
 
 export const checkApiKey = async (): Promise<boolean> => {
-  if (process.env.API_KEY) return true;
+  if (import.meta.env.VITE_GEMINI_API_KEY) return true;
   if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
     return await (window as any).aistudio.hasSelectedApiKey();
   }
@@ -21,7 +21,7 @@ export const checkApiKey = async (): Promise<boolean> => {
 };
 
 export const requestApiKey = async () => {
-  if (process.env.API_KEY) return true;
+  if (import.meta.env.VITE_GEMINI_API_KEY) return true;
   if (typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
     await (window as any).aistudio.openSelectKey();
     return true;
@@ -86,7 +86,7 @@ export const connectToDesignLab = async (callbacks: {
   onGrantBudget: (amount: number, reason: string, themeName: string) => void;
   onClose: () => void;
 }) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
   const grantBudgetTool = {
     name: 'grantBudget',
@@ -165,7 +165,7 @@ export const connectToDesignLab = async (callbacks: {
 };
 
 export const generateThemeSet = async (themeIdea: string, advancedData?: Partial<CollectionTheme>): Promise<CollectionTheme> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const modelName = 'gemini-3-flash-preview';
 
   const colors = advancedData?.colorScheme?.join(', ') || 'user-defined harmonious colors';
@@ -233,7 +233,7 @@ export const generateThemeSet = async (themeIdea: string, advancedData?: Partial
 };
 
 export const generateBoxArt = async (userId: string, themeId: string, themeName: string, visualStyle: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const modelName = 'gemini-2.5-flash-image';
   const prompt = `Commercial product photography of a premium 3D vinyl toy blind box packaging for a series called "${themeName}". Aesthetic: ${visualStyle}. The box should be colorful, have high-end graphic design, and clearly display "yumi. mystery series" in elegant typography. Studio lighting, isolated on white.`;
 
@@ -275,7 +275,7 @@ export const generateCharacterImage = async (
   size: '1K' | '2K' | '4K' = '1K'
 ): Promise<string> => {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
     const modelName = size === '1K' ? 'gemini-2.5-flash-image' : 'gemini-3-pro-image-preview';
 
     const prompt = `Adorable 3D vinyl collectible toy of "${character.name}". ${character.description}. Visual style: ${visualStyle}. Part of the "${themeName}" series. IMPORTANT: All characters must have consistent cute chibi proportions (big head, small body), front facing camera angle, and neutral studio lighting on a solid pastel background. High-quality 3D render.`;
@@ -322,7 +322,7 @@ export const editCharacterImage = async (
   editPrompt: string
 ): Promise<string> => {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
     const modelName = 'gemini-2.5-flash-image';
 
     const response = await ai.models.generateContent({
@@ -348,7 +348,7 @@ export const animateCharacter = async (
   prompt: string,
   aspectRatio: '16:9' | '9:16' = '16:9'
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const modelName = 'veo-3.1-fast-generate-preview';
 
   try {
@@ -365,7 +365,7 @@ export const animateCharacter = async (
     }
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    const res = await fetch(`${downloadLink}&key=${import.meta.env.VITE_GEMINI_API_KEY}`);
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   } catch (err) {
