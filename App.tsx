@@ -381,6 +381,9 @@ const App: React.FC = () => {
       return;
     }
 
+    const key = process.env.API_KEY || '';
+    console.log(`[Debug] Using API Key starting with: ${key.substring(0, 3)}...`);
+
     setLoading(true);
     setLoadingMsg('Unboxing your surprise...');
 
