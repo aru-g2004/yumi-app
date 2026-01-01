@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Package,
   LayoutGrid,
@@ -104,33 +103,37 @@ const App: React.FC = () => {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Stable reference for tracking server-side coin changes
+  const lastCoinValue = useRef<number | null>(null);
+
   // Real-time coin listener for notifications
   useEffect(() => {
-    if (!user) return;
-    const userRef = doc(db, 'users', user.id, 'profile', 'data');
-    let firstLoad = true;
-    let lastServerCoins = 0;
+    if (!user?.id) {
+      lastCoinValue.current = null;
+      return;
+    }
 
-    const unsubscribe = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
+    const userRef = doc(db, 'users', user.id, 'profile', 'data');
+
+    const unsubscribe = onSnapshot(userRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
         const newCoins = data.coins || 0;
 
-        // Only show notification if the SERVER-side value actually increased
-        // This prevents buyers from getting notified during their own purchase sync
-        if (!firstLoad && newCoins > lastServerCoins) {
-          const earned = newCoins - lastServerCoins;
+        // Ensure we have a baseline before showing notifications
+        if (lastCoinValue.current !== null && newCoins > lastCoinValue.current) {
+          const earned = newCoins - lastCoinValue.current;
           setNotification(`You earned ${earned} coins!`);
           setTimeout(() => setNotification(null), 5000);
         }
 
-        lastServerCoins = newCoins;
+        lastCoinValue.current = newCoins;
         setState(prev => ({ ...prev, coins: newCoins }));
-        firstLoad = false;
       }
     });
+
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
