@@ -44,7 +44,7 @@ export interface CollectionTheme {
   }[];
 }
 
-export type AppView = 'login' | 'onboarding' | 'marketplace' | 'studio-initial' | 'studio-design' | 'opening' | 'collection' | 'tools' | 'manufacturing';
+export type AppView = 'login' | 'onboarding' | 'marketplace' | 'studio-initial' | 'studio-design' | 'opening' | 'collection' | 'tools' | 'manufacturing' | 'series-preview';
 
 export interface AppState {
   coins: number;

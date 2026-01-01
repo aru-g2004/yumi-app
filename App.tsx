@@ -102,6 +102,7 @@ const App: React.FC = () => {
   const [isProducing, setIsProducing] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [previewCharacters, setPreviewCharacters] = useState<any[]>([]);
 
   // Stable reference for tracking server-side coin changes
   const lastCoinValue = useRef<number | null>(null);
@@ -477,6 +478,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleViewSeries = async (theme: CollectionTheme) => {
+    setLoading(true);
+    setLoadingMsg(`Loading figurines for ${theme.name}...`);
+    try {
+      const creatorId = (theme as any).createdBy || (theme as any).creatorId;
+      const chars = await getThemeCharacters(creatorId, theme.id);
+      setPreviewCharacters(chars);
+      setState(prev => ({ ...prev, currentTheme: theme }));
+      setView('series-preview');
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onUnboxingComplete = async () => {
     const themeToUse = unboxingTheme || state.currentTheme;
     if (!unboxingChar || !user || !themeToUse) return;
@@ -657,7 +674,7 @@ const App: React.FC = () => {
                     <h3 className="text-xl font-black mb-1">{theme.name}</h3>
                     <p className="text-[9px] font-black uppercase text-emerald-500 mb-6">By {theme.creatorName}</p>
                     <div className="flex gap-2 w-full">
-                      <button onClick={() => { setState(p => ({ ...p, currentTheme: theme })); setView('marketplace'); }} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase">View</button>
+                      <button onClick={() => handleViewSeries(theme)} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-stone-200 transition-colors">View</button>
                       <button onClick={() => handleOpenBox(theme)} className="flex-1 bg-emerald-400 py-3.5 rounded-xl font-black text-[9px] uppercase">Buy (100)</button>
                     </div>
                   </div>
@@ -750,6 +767,84 @@ const App: React.FC = () => {
                   <button onClick={() => handleAnimate('9:16')} className="bg-stone-50 hover:bg-stone-100 p-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] border border-stone-100">Portrait</button>
                 </div>
               </section>
+            </div>
+          </div>
+        )}
+        {view === 'series-preview' && state.currentTheme && (
+          <div className="space-y-16 py-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <button
+                onClick={() => setView('marketplace')}
+                className="flex items-center gap-2 text-stone-400 font-bold hover:text-stone-900 transition-colors bg-white px-6 py-3 rounded-full border border-stone-100 shadow-sm"
+              >
+                <ChevronLeft className="w-5 h-5" /> Back to Market
+              </button>
+              <div className="pt-8">
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-4 block">Official Series Set</span>
+                <h2 className="text-7xl font-black tracking-tighter mb-4">{state.currentTheme.name}</h2>
+                <p className="text-stone-400 text-xl font-light max-w-2xl mx-auto leading-relaxed">{state.currentTheme.description}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 max-w-5xl mx-auto">
+              {previewCharacters.length > 0 ? (
+                previewCharacters.map((char, i) => (
+                  <div key={i} className="group relative bg-white rounded-[3.5rem] p-8 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 overflow-hidden">
+                    <div className="absolute top-6 right-8">
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${char.rarity === 'Legendary' ? 'bg-rose-50 text-rose-500' :
+                        char.rarity === 'Rare' ? 'bg-amber-50 text-amber-500' :
+                          'bg-stone-50 text-stone-400'
+                        }`}>
+                        {char.rarity}
+                      </span>
+                    </div>
+                    <div className="aspect-square bg-stone-50 rounded-[2.5rem] overflow-hidden mb-8 shadow-inner border border-stone-100 flex items-center justify-center relative">
+                      {char.imageUrl ? (
+                        <img
+                          src={char.imageUrl}
+                          alt={char.name}
+                          className="w-full h-full object-cover grayscale transition-all duration-700 group-hover:grayscale-0 opacity-40 group-hover:opacity-100 scale-110 group-hover:scale-100"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-3">
+                          <Package className="w-12 h-12 text-stone-200" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-stone-300">Classified Item</span>
+                        </div>
+                      )}
+                      {/* Mystery Overlay */}
+                      {!char.imageUrl && (
+                        <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[2px]"></div>
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-black tracking-tight mb-2 text-stone-400 group-hover:text-stone-900 transition-colors">
+                      {char.imageUrl ? char.name : `Figurine #${i + 1}`}
+                    </h3>
+                    <p className="text-stone-300 group-hover:text-stone-500 text-sm leading-relaxed transition-colors line-clamp-2">
+                      {char.description || "Unbox to reveal this character's story and unique traits."}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                [...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-[3.5rem] p-8 shadow-xl border border-stone-50 overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-stone-50 rounded-[2.5rem] mb-8 shadow-inner border border-stone-100 flex items-center justify-center">
+                      <Package className="w-12 h-12 text-stone-100" />
+                    </div>
+                    <div className="h-6 w-1/2 bg-stone-50 rounded-full mb-2"></div>
+                    <div className="h-4 w-3/4 bg-stone-50 rounded-full"></div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-center pt-8">
+              <button
+                onClick={() => handleOpenBox(state.currentTheme!)}
+                className="bg-stone-900 text-white px-20 py-8 rounded-[2.5rem] font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-4 group"
+              >
+                <ShoppingBag className="w-6 h-6 text-emerald-400" />
+                Buy Blind Box (100)
+              </button>
             </div>
           </div>
         )}

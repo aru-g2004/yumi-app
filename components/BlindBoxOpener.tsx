@@ -64,41 +64,63 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, onCom
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
     >
-      <div className="relative w-80 h-96 flex items-center justify-center">
+      {/* Immersive Background Stage */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.15)_0%,transparent_50%)] animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-stone-900 to-transparent opacity-50"></div>
+      </div>
 
-        {/* Step 1 & 2: The Generated Box Art */}
+      <div className="relative w-full max-w-2xl flex flex-col items-center justify-center perspective-[2000px]">
+
+        {/* Step 1 & 2: The Generated Box Art (Bigger & 3D) */}
         {(step === 'box-sealed' || step === 'box-tearing') && (
           <div
-            className={`relative w-72 h-80 transition-all duration-1000 ${step === 'box-tearing' ? 'scale-125 opacity-0 blur-xl' : 'scale-100'}`}
+            className={`relative w-[400px] h-[450px] transition-all duration-1000 cursor-grab active:cursor-grabbing ${step === 'box-tearing' ? 'scale-[2] opacity-0 blur-2xl' : 'scale-110'
+              }`}
+            style={{
+              transform: `rotateY(${(tearProgress - 0.5) * 20}deg) rotateX(${isDragging ? 10 : 0}deg)`,
+              transformStyle: 'preserve-3d'
+            }}
             onMouseDown={handleStart}
             onTouchStart={handleStart}
           >
-            <div className="absolute inset-0 bg-white rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden border-4 border-white/20">
+            {/* Box Body */}
+            <div className="absolute inset-0 bg-white rounded-[4rem] shadow-[0_80px_160px_-40px_rgba(0,0,0,0.9)] overflow-hidden border-[6px] border-white/30 transform-gpu">
               {theme?.boxImageUrl ? (
-                <img src={theme.boxImageUrl} alt="Packaging" className="w-full h-full object-cover" />
+                <img src={theme.boxImageUrl} alt="Packaging" className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
               ) : (
-                <div className="w-full h-full bg-stone-900 flex flex-col items-center justify-center gap-4">
-                  <Box className="w-16 h-16 text-stone-700 animate-pulse" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-600">Themed Blind Box</p>
+                <div className="w-full h-full bg-stone-900 flex flex-col items-center justify-center gap-6">
+                  <Box className="w-24 h-24 text-stone-700 animate-bounce" />
+                  <p className="text-xs font-black uppercase tracking-[0.5em] text-stone-500">Premium Series</p>
                 </div>
               )}
-              {/* Reflection Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none"></div>
+
+              {/* Glossy Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20 pointer-events-none"></div>
+
+              {/* Dynamic Shadow on the box itself */}
+              <div className="absolute inset-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.2)] pointer-events-none"></div>
             </div>
 
-            {/* Tear Line Indicator */}
+            {/* Tear Interaction UI */}
             {step === 'box-sealed' && (
-              <div className="absolute top-1/2 left-0 w-full -translate-y-1/2 flex items-center justify-center z-10 pointer-events-none">
-                <div className="w-[120%] h-0.5 border-b-2 border-dashed border-white/30 relative">
+              <div className="absolute top-1/2 left-0 w-full -translate-y-1/2 flex items-center justify-center z-50 pointer-events-none">
+                <div className="w-[110%] h-1 bg-white/10 relative overflow-visible">
+                  {/* Progress Glow */}
                   <div
-                    className="absolute top-1/2 left-0 h-1 bg-white shadow-[0_0_15px_rgba(255,255,255,0.8)] transition-all rounded-full"
+                    className="absolute top-1/2 left-0 h-2 bg-gradient-to-r from-emerald-400 to-white shadow-[0_0_30px_rgba(52,211,153,0.8)] transition-all rounded-full"
                     style={{ width: `${tearProgress * 100}%`, transform: 'translateY(-50%)' }}
                   ></div>
+
+                  {/* Scissors / Handle */}
                   <div
-                    className="absolute top-1/2 -translate-y-1/2 bg-white p-3 rounded-full shadow-2xl transition-transform"
-                    style={{ left: `calc(${tearProgress * 100}% - 25px)`, transform: `translateY(-50%) rotate(${tearProgress * 360}deg)` }}
+                    className="absolute top-1/2 -translate-y-1/2 bg-white p-5 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition-transform border-4 border-emerald-400/20"
+                    style={{
+                      left: `calc(${tearProgress * 100}% - 35px)`,
+                      transform: `translateY(-50%) scale(${isDragging ? 1.2 : 1}) rotate(${tearProgress * 720}deg)`
+                    }}
                   >
-                    <Scissors className="w-5 h-5 text-stone-900" />
+                    <Scissors className="w-8 h-8 text-stone-900" />
                   </div>
                 </div>
               </div>
@@ -106,30 +128,42 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, onCom
           </div>
         )}
 
-        {/* Bag Stage Removed */}
-
-        {/* Step 4: The Masterpiece Reveal */}
+        {/* Step 4: The Masterpiece Reveal (Bigger & Epic) */}
         {step === 'finished' && (
-          <div className="relative w-80 h-80 animate-in zoom-in-50 duration-1000 ease-out">
-            <div className="absolute inset-0 bg-emerald-500 rounded-full opacity-30 blur-[100px] animate-pulse"></div>
-            <div className="relative w-full h-full rounded-[4rem] overflow-hidden border-8 border-white shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)]">
+          <div className="relative w-[450px] h-[450px] animate-in zoom-in-50 duration-1000 ease-out flex flex-col items-center">
+            {/* God Rays / Glow */}
+            <div className="absolute inset-0 bg-emerald-500 rounded-full opacity-40 blur-[120px] animate-pulse scale-150"></div>
+            <div className="absolute inset-0 bg-white rounded-full opacity-10 blur-[60px] animate-ping"></div>
+
+            <div className="relative w-full h-full rounded-[5rem] overflow-hidden border-[12px] border-white shadow-[0_80px_160px_-30px_rgba(0,0,0,0.7)] z-10 bg-white">
               <img
                 src={character.imageUrl}
                 alt={character.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover animate-in fade-in duration-1000"
               />
+              {/* Ambient Light on character */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
             </div>
 
-            <div className="absolute -top-10 -right-10 bg-emerald-400 text-stone-900 p-7 rounded-[2.5rem] shadow-2xl animate-bounce border-4 border-white">
-              <Sparkles className="w-12 h-12 fill-white" />
+            {/* Floating Badges */}
+            <div className="absolute -top-12 -right-12 bg-white text-emerald-600 p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-bounce border-4 border-stone-50 z-20">
+              <Sparkles className="w-14 h-14 fill-emerald-50" />
             </div>
 
-            <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 text-center w-80 space-y-3">
-              <h2 className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{character.name}</h2>
-              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-2xl px-6 py-2 rounded-full border border-white/30">
-                <div className={`w-2 h-2 rounded-full ${character.rarity === 'Legendary' ? 'bg-rose-400' : 'bg-emerald-400'}`}></div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                  {character.rarity} Found
+            {/* Hero Text */}
+            <div className="absolute -bottom-48 left-1/2 -translate-x-1/2 text-center w-[500px] space-y-6 z-20">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-emerald-400">Legendary Find unlocked</span>
+                <h2 className="text-7xl font-black text-white tracking-tighter drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] leading-none italic">{character.name}</h2>
+              </div>
+
+              <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur-3xl px-10 py-4 rounded-full border border-white/20 shadow-2xl">
+                <div className={`w-3 h-3 rounded-full animate-pulse ${character.rarity === 'Legendary' ? 'bg-rose-400 shadow-[0_0_15px_rgba(251,113,133,0.8)]' :
+                    character.rarity === 'Rare' ? 'bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.8)]' :
+                      'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]'
+                  }`}></div>
+                <span className="text-xs font-black uppercase tracking-widest text-white">
+                  {character.rarity} EDITION
                 </span>
               </div>
             </div>
@@ -138,10 +172,10 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, onCom
 
       </div>
 
-      <div className="mt-32 max-w-xs text-center">
-        <p className="text-stone-500 font-black uppercase tracking-[0.2em] text-[10px] animate-pulse">
-          {step === 'box-sealed' && "Slash to open the shipment..."}
-          {step === 'finished' && "A new gem added to your studio!"}
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 max-w-xs text-center">
+        <p className="text-stone-500 font-black uppercase tracking-[0.4em] text-xs animate-pulse">
+          {step === 'box-sealed' && "Slash to open the shipment"}
+          {step === 'finished' && "Masterpiece saved to shelf"}
         </p>
       </div>
     </div>
