@@ -235,15 +235,16 @@ const App: React.FC = () => {
 
   const handleError = async (error: any) => {
     const errorStr = String(error);
+    const apiMessage = error?.message || errorStr;
     console.error("Caught Error:", error);
 
-    if (errorStr.toLowerCase().includes('403') || errorStr.toLowerCase().includes('permission') || errorStr.toLowerCase().includes('not found')) {
-      setGlobalError("Paid API Key required. Access your billing account at ai.google.dev/gemini-api/docs/billing");
+    if (errorStr.toLowerCase().includes('403') || errorStr.toLowerCase().includes('401') || errorStr.toLowerCase().includes('permission')) {
+      setGlobalError(`API Access Issue: ${apiMessage}. (If this is 403, billing is likely required for public domains)`);
       setApiKeySelected(false);
     } else if (errorStr.toLowerCase().includes('429')) {
       setGlobalError("Generator Heat: Rate limit reached. Taking a short break...");
     } else {
-      setGlobalError(`Production Error: ${errorStr.substring(0, 80)}...`);
+      setGlobalError(`Production Error: ${errorStr.substring(0, 100)}...`);
     }
   };
 
