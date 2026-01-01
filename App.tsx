@@ -38,7 +38,7 @@ import {
   requestApiKey,
   checkApiKey
 } from './services/geminiService';
-import LiveDesignLab from './components/LiveDesignLab';
+
 import BlindBoxOpener from './components/BlindBoxOpener';
 import CharacterShelf from './components/CharacterShelf';
 import Onboarding from './components/Onboarding';
