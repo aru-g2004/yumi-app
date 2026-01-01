@@ -381,9 +381,6 @@ const App: React.FC = () => {
       return;
     }
 
-    const key = import.meta.env.VITE_GEMINI_API_KEY || '';
-    console.log(`[Debug] Using API Key starting with: ${key.substring(0, 3)}...`);
-
     setLoading(true);
     setLoadingMsg('Unboxing your surprise...');
 
