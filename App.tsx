@@ -109,22 +109,23 @@ const App: React.FC = () => {
     if (!user) return;
     const userRef = doc(db, 'users', user.id, 'profile', 'data');
     let firstLoad = true;
+    let lastServerCoins = 0;
+
     const unsubscribe = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
         const data = doc.data();
         const newCoins = data.coins || 0;
 
-        setState(prev => {
-          // Only show notification if this is a sync from server (newCoins > prev.coins)
-          // AND it's not the first time we load the app
-          if (!firstLoad && newCoins > prev.coins) {
-            const earned = newCoins - prev.coins;
-            setNotification(`You earned ${earned} coins!`);
-            setTimeout(() => setNotification(null), 5000);
-          }
-          return { ...prev, coins: newCoins };
-        });
+        // Only show notification if the SERVER-side value actually increased
+        // This prevents buyers from getting notified during their own purchase sync
+        if (!firstLoad && newCoins > lastServerCoins) {
+          const earned = newCoins - lastServerCoins;
+          setNotification(`You earned ${earned} coins!`);
+          setTimeout(() => setNotification(null), 5000);
+        }
 
+        lastServerCoins = newCoins;
+        setState(prev => ({ ...prev, coins: newCoins }));
         firstLoad = false;
       }
     });
@@ -215,8 +216,11 @@ const App: React.FC = () => {
 
   const addCoins = (amount: number, themeName?: string) => {
     console.log(`[App] Adding ${amount} coins. Theme: ${themeName}`);
-    setNotification(`You earned ${amount} coins!`);
-    setTimeout(() => setNotification(null), 5000);
+    // Show notification for local-only/guest updates
+    if (!user) {
+      setNotification(`You earned ${amount} coins!`);
+      setTimeout(() => setNotification(null), 5000);
+    }
 
     setState(prev => {
       const newCoins = prev.coins + amount;
@@ -561,14 +565,17 @@ const App: React.FC = () => {
         </div>
       )}
       {showSpin && <SpinWheel
-        onWin={(amount) => {
-          addCoins(amount);
+        onWin={async (amount) => {
           setShowSpin(false);
           if (user) {
-            updateLastSpin(user.id);
-            // Update local state to reflect the spin
+            // Persist to server (listener will handle local state and notification)
+            await updateUserCoins(user.id, amount);
+            await updateLastSpin(user.id);
             const now = Date.now();
             setUser(prev => prev ? { ...prev, lastSpin: now } : null);
+          } else {
+            // Guest mode
+            addCoins(amount);
           }
         }}
         onClose={() => setShowSpin(false)}
