@@ -113,16 +113,18 @@ const App: React.FC = () => {
       if (doc.exists()) {
         const data = doc.data();
         const newCoins = data.coins || 0;
-        if (!firstLoad) {
-          setState(prev => {
-            if (newCoins > prev.coins) {
-              const earned = newCoins - prev.coins;
-              setNotification(`You earned ${earned} coins!`);
-              setTimeout(() => setNotification(null), 5000);
-            }
-            return { ...prev, coins: newCoins };
-          });
-        }
+
+        setState(prev => {
+          // Only show notification if this is a sync from server (newCoins > prev.coins)
+          // AND it's not the first time we load the app
+          if (!firstLoad && newCoins > prev.coins) {
+            const earned = newCoins - prev.coins;
+            setNotification(`You earned ${earned} coins!`);
+            setTimeout(() => setNotification(null), 5000);
+          }
+          return { ...prev, coins: newCoins };
+        });
+
         firstLoad = false;
       }
     });
@@ -213,6 +215,9 @@ const App: React.FC = () => {
 
   const addCoins = (amount: number, themeName?: string) => {
     console.log(`[App] Adding ${amount} coins. Theme: ${themeName}`);
+    setNotification(`You earned ${amount} coins!`);
+    setTimeout(() => setNotification(null), 5000);
+
     setState(prev => {
       const newCoins = prev.coins + amount;
       const newThemes = themeName && !prev.generatedThemes?.includes(themeName)
@@ -492,7 +497,6 @@ const App: React.FC = () => {
 
         return {
           ...prev,
-          coins: prev.coins - 100,
           collection: newCollection,
           activeCharacter: unboxingChar
         };
