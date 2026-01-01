@@ -72,7 +72,7 @@ const StudioFlow: React.FC<StudioFlowProps> = ({ user, coins, onStart, previousT
 
                     <div className="relative z-10 space-y-12">
                         <div className="space-y-4">
-                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500 block">{user.studioName || 'Your'} Studio</span>
+                            <span className="text-[20px] font-black uppercase tracking-[0.4em] text-rose-500 block">{user.studioName || 'Your'} Studio</span>
                             <h2 className="text-6xl font-black tracking-tighter">Ready to Build?</h2>
                             <p className="text-xl text-stone-400 font-light max-w-lg mx-auto leading-relaxed">
                                 Create your blind box collection with <span className="text-stone-900 font-black">500 coins</span>.
