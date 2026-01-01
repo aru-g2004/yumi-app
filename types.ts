@@ -4,6 +4,9 @@ export interface User {
   name: string;
   email: string;
   picture: string;
+  studioName?: string;
+  hasOnboarded?: boolean;
+  lastSpin?: number;
 }
 
 export interface Character {
@@ -24,8 +27,15 @@ export interface CollectionTheme {
   id: string;
   name: string;
   description: string;
-  visualStyle: string; // Describes the global aesthetic (e.g. "matte pastel", "translucent neon")
-  boxImageUrl?: string; // Generated packaging art
+  visualStyle: string;
+  boxImageUrl?: string;
+  keywords?: string;
+  colorScheme?: string[];
+  toyFinish?: string;
+  variationHint?: string;
+  inspirationImages?: string[];
+  rareTraits?: string;
+  legendaryTraits?: string;
   characterDefinitions: {
     name: string;
     description: string;
@@ -34,7 +44,7 @@ export interface CollectionTheme {
   }[];
 }
 
-export type AppView = 'login' | 'lobby' | 'theme-select' | 'opening' | 'collection' | 'tools' | 'mini-game' | 'manufacturing' | 'marketplace';
+export type AppView = 'login' | 'onboarding' | 'marketplace' | 'studio-initial' | 'studio-design' | 'opening' | 'collection' | 'tools' | 'manufacturing';
 
 export interface AppState {
   coins: number;

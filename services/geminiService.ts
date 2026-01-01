@@ -3,6 +3,7 @@ import { GoogleGenAI, Type, GenerateContentResponse, Modality, LiveServerMessage
 import { uploadImageToStorage } from "./firebase";
 import { CollectionTheme, Character } from "../types";
 
+// Enhanced usage logger for easier tracking
 const logUsage = (model: string, operation: string, response: any) => {
   console.group(`%c[Gemini API Debug] ${operation}`, "color: #6366f1; font-weight: bold; background: #f0f0ff; padding: 2px 5px; border-radius: 4px;");
   console.log("Model:", model);
@@ -163,17 +164,33 @@ export const connectToDesignLab = async (callbacks: {
   return sessionPromise;
 };
 
-export const generateThemeSet = async (themeIdea: string): Promise<CollectionTheme> => {
+export const generateThemeSet = async (themeIdea: string, advancedData?: Partial<CollectionTheme>): Promise<CollectionTheme> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Design a high-end 3D toy collection based on the theme: "${themeIdea}". 
+
+  const colors = advancedData?.colorScheme?.join(', ') || 'user-defined harmonious colors';
+  const finish = advancedData?.toyFinish || 'high-gloss vinyl';
+  const variation = advancedData?.variationHint || 'varying themes and details';
+  const rareTraits = advancedData?.rareTraits || 'special material details';
+  const legendaryTraits = advancedData?.legendaryTraits || 'unique premium accents';
+
+  const prompt = `Design a consistent high-end 3D toy collection.
+  Theme Idea: "${themeIdea}"
+  Keywords: "${advancedData?.keywords || themeIdea}"
+  Color Scheme: ${colors}
+  Toy Finish: ${finish}
+  Variation Logic: ${variation}
+  Rare Traits: ${rareTraits}
+  Legendary Traits: ${legendaryTraits}
+
   Provide:
   1. A catchy series name.
-  2. A whimsical description.
-  3. A global "visualStyle" summary (e.g. "semi-transparent frosted plastic with neon inner glow").
+  2. A whimsical description for the entire series.
+  3. A global "visualStyle" summary that incorporates the finish and color scheme.
   4. Exactly 6 characters (3 Common, 2 Rare, 1 Legendary). 
   
-  For each character, include a highly detailed visual description suitable for an image generator. 
+  For each character, include a highly detailed visual description (2-3 sentences) ensuring they all fit the global visual style but have unique traits based on their rarity (Rare and Legendary must be visibly more special).
+  
   Output valid JSON only.`;
 
   const response = await ai.models.generateContent({

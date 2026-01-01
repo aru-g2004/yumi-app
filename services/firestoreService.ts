@@ -29,13 +29,23 @@ export const createOrUpdateUserProfile = async (user: User): Promise<void> => {
     const existingDoc = await getDoc(userRef);
 
     if (existingDoc.exists()) {
-        // Update existing profile
-        await updateDoc(userRef, {
+        // Update existing profile - only update core fields, don't overwrite onboarding
+        const updates: any = {
             name: user.name,
             email: user.email,
             picture: user.picture,
             lastActive: serverTimestamp()
-        });
+        };
+
+        // Only update these if they are explicitly provided (e.g. from handleOnboardingComplete)
+        if (user.studioName) updates.studioName = user.studioName;
+
+        // ONLY update hasOnboarded to true, never back to false
+        if (user.hasOnboarded === true) {
+            updates.hasOnboarded = true;
+        }
+
+        await updateDoc(userRef, updates);
     } else {
         // Create new profile
         await setDoc(userRef, {
@@ -43,7 +53,8 @@ export const createOrUpdateUserProfile = async (user: User): Promise<void> => {
             name: user.name,
             email: user.email,
             picture: user.picture,
-            coins: 250, // Starting coins
+            coins: 500, // Increased starting coins for overhaul
+            hasOnboarded: false,
             createdAt: serverTimestamp(),
             lastActive: serverTimestamp(),
             stats: {
@@ -73,8 +84,22 @@ export const getUserProfile = async (userId: string): Promise<any | null> => {
  */
 export const updateUserCoins = async (userId: string, amount: number): Promise<void> => {
     const userRef = doc(db, 'users', userId, 'profile', 'data');
+    const profile = await getUserProfile(userId);
+    const currentCoins = profile?.coins || 0;
+
+    if (currentCoins + amount < 0) {
+        throw new Error('Insufficient coins');
+    }
+
     await updateDoc(userRef, {
         coins: increment(amount)
+    });
+};
+
+export const updateLastSpin = async (userId: string): Promise<void> => {
+    const userRef = doc(db, 'users', userId, 'profile', 'data');
+    await updateDoc(userRef, {
+        lastSpin: Date.now()
     });
 };
 
@@ -98,6 +123,13 @@ export const saveTheme = async (
         description: theme.description,
         visualStyle: theme.visualStyle,
         boxImageUrl: theme.boxImageUrl,
+        keywords: theme.keywords || '',
+        colorScheme: theme.colorScheme || [],
+        toyFinish: theme.toyFinish || '',
+        variationHint: theme.variationHint || '',
+        inspirationImages: theme.inspirationImages || [],
+        rareTraits: theme.rareTraits || '',
+        legendaryTraits: theme.legendaryTraits || '',
         createdAt: serverTimestamp(),
         createdBy: userId,
         characterCount: theme.characterDefinitions?.length || 0,
@@ -320,11 +352,13 @@ export const purchaseBlindBox = async (
         coins: increment(-price)
     });
 
-    // Add coins to creator (80% royalty)
-    const creatorRef = doc(db, 'users', creatorId, 'profile', 'data');
-    batch.update(creatorRef, {
-        coins: increment(Math.floor(price * 0.8))
-    });
+    // Add coins to creator (100% royalty) - ONLY if it's not a self-purchase
+    if (buyerId !== creatorId) {
+        const creatorRef = doc(db, 'users', creatorId, 'profile', 'data');
+        batch.update(creatorRef, {
+            coins: increment(price)
+        });
+    }
 
     // Increment purchase count on theme
     const themeRef = doc(db, 'users', creatorId, 'themes', themeId);
