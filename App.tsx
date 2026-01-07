@@ -776,16 +776,31 @@ const App: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {state.publicThemes.map((theme) => (
-                  <div key={theme.id} className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 flex flex-col items-center text-center">
-                    <div className="w-full aspect-square bg-stone-50 rounded-[2rem] overflow-hidden mb-5 flex items-center justify-center">
+                  <div key={theme.id} className="bg-white rounded-[2.5rem] p-5 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 flex flex-col items-center text-center h-[420px]">
+                    <div className="w-full aspect-square bg-stone-50 rounded-[2rem] overflow-hidden mb-3 flex items-center justify-center">
                       <img src={theme.boxImageUrl} className="w-full h-full object-contain" alt={theme.name} />
                     </div>
-                    <h3 className="text-xl font-black mb-1">{theme.name}</h3>
-                    <p className="text-[9px] font-black uppercase text-emerald-500 mb-6">By {theme.creatorName}</p>
+                    <div className="flex flex-col flex-1 justify-between w-full h-full">
+                      <div className="space-y-1">
+                        <h3
+                          className="font-black leading-tight mb-1 overflow-hidden"
+                          style={{
+                            fontSize: theme.name.length > 20 ? '1.1rem' : theme.name.length > 12 ? '1.4rem' : '1.7rem',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            minHeight: '3rem'
+                          }}
+                        >
+                          {theme.name}
+                        </h3>
+                        <p className="text-[9px] font-black uppercase text-emerald-500">By {theme.creatorName}</p>
+                      </div>
 
-                    <div className="flex gap-2 w-full">
-                      <button onClick={() => handleViewSeries(theme)} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-stone-200 transition-colors">View</button>
-                      <button onClick={() => handleOpenBox(theme)} className="flex-1 bg-emerald-400 py-3.5 rounded-xl font-black text-[9px] uppercase">Buy (100)</button>
+                      <div className="flex w-full">
+                        <button onClick={() => handleViewSeries(theme)} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-stone-200 transition-colors">View</button>
+                        <button onClick={() => handleOpenBox(theme)} className="flex-1 bg-emerald-400 py-3.5 rounded-xl font-black text-[9px] uppercase">Buy (100)</button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -828,7 +843,7 @@ const App: React.FC = () => {
                     {/* Figurine Preview */}
                     <div className={`aspect-square rounded-[1.5rem] overflow-hidden mb-6 shadow-inner border flex items-center justify-center relative transition-all duration-700 ${isDone ? 'bg-white border-stone-100 shadow-emerald-50' : 'bg-stone-50 border-dashed border-stone-200'}`}>
                       {isDone ? (
-                        <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover animate-in zoom-in duration-1000" />
+                        <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover animate-in zoom-in duration-1000 grayscale opacity-80" />
                       ) : isBuilding ? (
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-16 h-16 border-4 border-stone-100 border-t-emerald-500 rounded-full animate-spin"></div>
@@ -937,9 +952,9 @@ const App: React.FC = () => {
                 <p className="text-stone-500 text-lg leading-relaxed font-light p-8 bg-stone-50 rounded-[2.5rem] border border-stone-100">{state.activeCharacter.description}</p>
               </div>
             </div>
-
           </div>
         )}
+
         {view === 'series-preview' && state.currentTheme && (
           <div className="space-y-16 py-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="flex flex-col items-center text-center space-y-6">
@@ -949,57 +964,53 @@ const App: React.FC = () => {
               >
                 <ChevronLeft className="w-5 h-5" /> Back to Market
               </button>
-              <div className="pt-8">
+              <div className="pt-8 mb-10">
                 <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-4 block">Official Series Set</span>
                 <h2 className="text-7xl font-black tracking-tighter mb-4">{state.currentTheme.name}</h2>
                 <p className="text-stone-400 text-xl font-light max-w-2xl mx-auto leading-relaxed">{state.currentTheme.description}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 max-w-5xl mx-auto">
-              {previewCharacters.length > 0 ? (
-                previewCharacters.map((char, i) => (
-                  <div key={i} className="group relative bg-white rounded-[3.5rem] p-8 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 overflow-hidden">
-                    <div className="absolute top-6 right-8">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${char.rarity === 'Legendary' ? 'bg-rose-50 text-rose-500' :
-                        char.rarity === 'Rare' ? 'bg-amber-50 text-amber-500' :
-                          'bg-stone-50 text-stone-400'
-                        }`}>
-                        {char.rarity}
-                      </span>
-                    </div>
-                    <div className="aspect-square bg-stone-50 rounded-[2.5rem] overflow-hidden mb-8 shadow-inner border border-stone-100 flex items-center justify-center relative">
-                      {char.imageUrl ? (
-                        <img
-                          src={char.imageUrl}
-                          alt={char.name}
-                          className="w-full h-full object-cover grayscale transition-all duration-700 group-hover:grayscale-0 opacity-40 group-hover:opacity-100 scale-110 group-hover:scale-100"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-3">
-                          <Package className="w-12 h-12 text-stone-200" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-stone-300">Classified Item</span>
-                        </div>
-                      )}
-                      {/* Mystery Overlay */}
-                      {!char.imageUrl && (
-                        <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[2px]"></div>
-                      )}
-                    </div>
-                    <div className="h-6 w-full"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto items-start">
+              {/* Left: Box Art */}
+              <div className="sticky top-10 flex justify-center lg:justify-end">
+                <div className="bg-white rounded-[4rem] p-8 shadow-2xl border border-stone-50 flex items-center justify-center aspect-square relative overflow-hidden group max-w-[420px] w-full">
+                  <div className="absolute inset-0 bg-gradient-to-br from-stone-50/50 to-transparent" />
+                  <img
+                    src={state.currentTheme.boxImageUrl}
+                    alt={state.currentTheme.name}
+                    className="w-full h-full object-contain relative z-10 transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute bottom-10 inset-x-0 text-center z-20">
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-stone-300 mb-2">Mystery Series</p>
+                    <h3 className="text-2xl font-black tracking-tight">{state.currentTheme.name}</h3>
                   </div>
-                ))
-              ) : (
-                [...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-[3.5rem] p-8 shadow-xl border border-stone-50 overflow-hidden animate-pulse">
-                    <div className="aspect-square bg-stone-50 rounded-[2.5rem] mb-8 shadow-inner border border-stone-100 flex items-center justify-center">
-                      <Package className="w-12 h-12 text-stone-100" />
-                    </div>
-                    <div className="h-6 w-1/2 bg-stone-50 rounded-full mb-2"></div>
-                    <div className="h-4 w-3/4 bg-stone-50 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Right: Character Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                {(previewCharacters.length > 0 ? previewCharacters : Array(6).fill(null)).map((char, i) => (
+                  <div key={i} className="group aspect-square bg-white rounded-[2.5rem] shadow-xl border border-stone-50 hover:scale-[1.05] transition-all duration-500 overflow-hidden relative flex items-center justify-center p-4">
+                    {char?.imageUrl ? (
+                      <img
+                        src={char.imageUrl}
+                        alt={char.name || `Figurine #${i + 1}`}
+                        className="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Package className="w-6 h-6 text-stone-200" />
+                        <span className="text-[7px] font-black uppercase tracking-widest text-stone-300">Classified</span>
+                      </div>
+                    )}
+                    {/* Mystery Overlay */}
+                    {(!char || !char.imageUrl) && (
+                      <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[1px]"></div>
+                    )}
                   </div>
-                ))
-              )}
+                ))}
+              </div>
             </div>
 
             <div className="flex justify-center pt-8">
@@ -1029,7 +1040,7 @@ const App: React.FC = () => {
           <span className="text-[9px] font-black uppercase">Shelf</span>
         </button>
       </nav>
-    </div>
+    </div >
   );
 };
 
