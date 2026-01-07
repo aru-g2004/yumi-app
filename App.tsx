@@ -32,8 +32,6 @@ import {
   generateThemeSet,
   generateCharacterImage,
   generateBoxArt,
-  editCharacterImage,
-  animateCharacter,
   requestApiKey,
   checkApiKey
 } from './services/geminiService';
@@ -60,7 +58,8 @@ import {
   getPublicThemes,
   purchaseBlindBox,
   getThemeCharacters,
-  updateLastSpin
+  updateLastSpin,
+  deleteTheme
 } from './services/firestoreService';
 
 const PRESET_THEMES = [
@@ -279,21 +278,85 @@ const App: React.FC = () => {
 
   const [showSpin, setShowSpin] = useState(false);
 
+  const urlToBase64 = async (url: string): Promise<string> => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          resolve(base64String.split(',')[1]); // Return raw base64 without prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn('[Template Seed] Failed to fetch image for base64:', err);
+      return '';
+    }
+  };
+
   const handleCreateTheme = async (advancedData: Partial<CollectionTheme>) => {
     if (!user) return;
     setLoading(true);
     setLoadingMsg('Initiating series creation...');
+    let tempThemeId: string | null = null;
 
     try {
       await updateUserCoins(user.id, -500);
       setState(prev => ({ ...prev, coins: prev.coins - 500 }));
 
       setLoadingMsg('Writing series DNA...');
-      const theme = await generateThemeSet(advancedData.name || 'Untitled', advancedData);
-      setLoadingMsg('Rendering visual packaging...');
-      const boxArt = await generateBoxArt(user.id, theme.id, theme.name, theme.visualStyle);
+      let theme = await generateThemeSet(advancedData.name || 'Untitled', advancedData);
+      tempThemeId = theme.id; // Store for potential rollback
 
-      const finalTheme = { ...theme, ...advancedData, boxImageUrl: boxArt };
+      // Validation Guard: Ensure character definitions aren't empty/malformed
+      if (!theme.characterDefinitions || theme.characterDefinitions.length === 0) {
+        throw new Error('AI failed to generate unique characters. Please try again.');
+      }
+
+      // Ensure every character has a name and description before proceeding
+      theme.characterDefinitions = theme.characterDefinitions.map((d, i) => ({
+        ...d,
+        name: d.name || `Figurine #${i + 1}`,
+        description: d.description || `A unique character from the ${theme.name} series.`
+      }));
+
+      setLoadingMsg('Rendering visual packaging...');
+      const boxArt = await generateBoxArt(user.id, theme.id, theme.name, theme.visualStyle, user.studioName);
+
+      // Template Seeding: If using a template, fetch its characters to find a baseline
+      let seedBaselineData = '';
+      if ((advancedData as any).id && (advancedData as any).creatorId) {
+        setLoadingMsg('Synchronizing template design...');
+        try {
+          const sourceChars = await getThemeCharacters((advancedData as any).creatorId, (advancedData as any).id);
+          if (sourceChars.length > 0 && sourceChars[0].imageUrl) {
+            seedBaselineData = await urlToBase64(sourceChars[0].imageUrl);
+          }
+        } catch (seedErr) {
+          console.warn('[Template Seed] Error fetching source characters:', seedErr);
+        }
+      }
+
+      // Safe Merge: Protect AI-generated names/descriptions from being overwritten by empty form inputs
+      const finalTheme: CollectionTheme = {
+        ...theme,
+        ...advancedData,
+        boxImageUrl: boxArt,
+        id: theme.id, // Ensure we keep the AI-generated ID
+        characterDefinitions: theme.characterDefinitions.map((aiDef, i) => {
+          const userDef = advancedData.characterDefinitions?.[i];
+          return {
+            ...aiDef,
+            // Only use user input if it's not just whitespace
+            name: userDef?.name?.trim() ? userDef.name.trim() : aiDef.name,
+            description: userDef?.description?.trim() ? userDef.description.trim() : aiDef.description,
+          };
+        })
+      };
+
       await saveTheme(user.id, finalTheme, true);
 
       setState(prev => ({
@@ -311,70 +374,140 @@ const App: React.FC = () => {
       }));
 
       setView('manufacturing');
-      startSequentialProduction(finalTheme);
+      startSequentialProduction(finalTheme, seedBaselineData);
     } catch (error) {
+      console.error('[Creation Failure] Cleaning up and refunding...');
+
+      // Rollback: Deleting theme record if it was created
+      if (tempThemeId) {
+        try {
+          await deleteTheme(user.id, tempThemeId);
+        } catch (delErr) {
+          console.error('[Rollback Error] Failed to delete theme:', delErr);
+        }
+      }
+
+      // Refund the 500 coins fee
+      try {
+        await updateUserCoins(user.id, 500);
+        setState(prev => ({ ...prev, coins: prev.coins + 500 }));
+      } catch (refundErr) {
+        console.error('[Rollback Error] Failed to refund coins:', refundErr);
+      }
+
       await handleError(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const startSequentialProduction = async (theme: CollectionTheme) => {
+  const startSequentialProduction = async (theme: CollectionTheme, initialBaseline?: string) => {
     if (isProducing) return;
     if (!user) {
       setGlobalError('You must be logged in to produce characters');
       return;
     }
     setIsProducing(true);
+    setActiveStep(0);
     setGlobalError(null);
 
-    const defs = theme.characterDefinitions;
+    // Sort definitions by rarity: Common -> Rare -> Legendary
+    const rarityOrder: Record<string, number> = { 'Common': 1, 'Rare': 2, 'Legendary': 3 };
+    const sortedDefs = [...theme.characterDefinitions].sort((a, b) =>
+      rarityOrder[a.rarity as keyof typeof rarityOrder] - rarityOrder[b.rarity as keyof typeof rarityOrder]
+    );
 
-    for (let i = 0; i < defs.length; i++) {
-      if (theme.characterDefinitions[i].imageUrl) {
-        setActiveStep(i + 1);
-        continue;
-      }
-
-      setActiveStep(i);
-
+    // Helper to generate and update state
+    const produceCharacter = async (index: number, baselineBase64?: string) => {
+      setActiveStep(index);
       try {
-        const url = await generateCharacterImage(user.id, theme.id, defs[i], theme.name, theme.visualStyle, '1K');
-        const characterWithImage = { ...defs[i], imageUrl: url };
-        await saveCharacter(user.id, theme.id, characterWithImage);
+        const { url, base64 } = await generateCharacterImage(user.id, theme.id, sortedDefs[index], theme.name, theme.visualStyle, '1K', baselineBase64);
+        sortedDefs[index].imageUrl = url;
 
         setState(prev => {
           if (!prev.currentTheme) return prev;
           const updatedDefs = [...prev.currentTheme.characterDefinitions];
-          updatedDefs[i] = { ...updatedDefs[i], imageUrl: url };
+          // Find original index in state to update correctly
+          const originalIdx = prev.currentTheme.characterDefinitions.findIndex(d => d.name === sortedDefs[index].name);
+          if (originalIdx !== -1) {
+            updatedDefs[originalIdx] = { ...updatedDefs[originalIdx], imageUrl: url };
+          }
           return {
             ...prev,
             currentTheme: { ...prev.currentTheme, characterDefinitions: updatedDefs }
           };
         });
 
-        await new Promise(r => setTimeout(r, 4000));
+        // Final save to db for this character
+        await saveCharacter(user.id, theme.id, { ...sortedDefs[index], imageUrl: url });
+        return base64; // Return base64 for baseline support
       } catch (err) {
-        handleError(err);
-        setIsProducing(false);
-        return;
+        throw err;
       }
+    };
+
+    try {
+      // Flow: 1 -> 2 -> 2 -> 1
+      // 1. Generate the first "Baseline" figurine (using initialBaseline if provided)
+      const baselineBase64 = await produceCharacter(0, initialBaseline);
+      await new Promise(r => setTimeout(r, 2000));
+
+      // 2. Generate next 2 in parallel
+      await Promise.all([
+        produceCharacter(1, baselineBase64),
+        produceCharacter(2, baselineBase64)
+      ]);
+      await new Promise(r => setTimeout(r, 2000));
+
+      // 3. Generate next 2 in parallel
+      await Promise.all([
+        produceCharacter(3, baselineBase64),
+        produceCharacter(4, baselineBase64)
+      ]);
+      await new Promise(r => setTimeout(r, 2000));
+
+      // 4. Generate the final figurine
+      await produceCharacter(5, baselineBase64);
+
+    } catch (err) {
+      console.error('[Production Failure] Cleaning up and refunding for theme:', theme.id);
+
+      try {
+        await deleteTheme(user.id, theme.id);
+
+        // Remove from local publicThemes list if it was added
+        setState(prev => ({
+          ...prev,
+          currentTheme: null,
+          publicThemes: prev.publicThemes.filter(t => t.id !== theme.id)
+        }));
+
+        // Refund the 500 coins fee
+        await updateUserCoins(user.id, 500);
+        setState(prev => ({ ...prev, coins: prev.coins + 500 }));
+
+        setGlobalError(`Production failed for "${theme.name}". 500 coins have been refunded.`);
+      } catch (rollbackErr) {
+        console.error('[Rollback Error] Failed during production cleanup:', rollbackErr);
+      }
+
+      handleError(err);
+      setIsProducing(false);
+      setView('marketplace'); // Back to safety
+      return;
     }
 
     setIsProducing(false);
     setActiveStep(6);
 
+    // After completion, reload theme data to ensure sync
     if (user) {
       try {
         const themes = await getUserThemes(user.id);
-        const updatedTheme = themes.find(t => t.id === theme.id);
-        if (updatedTheme) {
-          setState(prev => ({
-            ...prev,
-            currentTheme: updatedTheme,
-            themeHistory: themes
-          }));
-        }
+        setState(prev => ({
+          ...prev,
+          themeHistory: themes
+        }));
       } catch (error) {
         console.error('[Production Complete] Error reloading theme:', error);
       }
@@ -439,46 +572,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleEdit = async () => {
-    if (!state.activeCharacter || !editPrompt) return;
-    setLoading(true);
-    setLoadingMsg('Refining 3D model...');
-    try {
-      const newImageUrl = await editCharacterImage(state.activeCharacter.imageUrl, editPrompt);
-      const updated = { ...state.activeCharacter, imageUrl: newImageUrl };
-      setState(prev => ({
-        ...prev,
-        activeCharacter: updated,
-        collection: prev.collection.map(c => c.id === updated.id ? updated : c)
-      }));
-      setEditPrompt('');
-    } catch (error) {
-      await handleError(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAnimate = async (aspect: '16:9' | '9:16') => {
-    if (!state.activeCharacter) return;
-    setLoading(true);
-    setLoadingMsg('Animating 3D physics...');
-    try {
-      const videoUrl = await animateCharacter(state.activeCharacter.imageUrl, '', aspect);
-      const updated = { ...state.activeCharacter, videoUrl };
-      setState(prev => ({
-        ...prev,
-        activeCharacter: updated,
-        collection: prev.collection.map(c => c.id === updated.id ? updated : c)
-      }));
-    } catch (error) {
-      await handleError(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleViewSeries = async (theme: CollectionTheme) => {
+    // Look-ahead Optimization: If definitions are already present on the theme object, show them immediately
+    if (theme.characterDefinitions && theme.characterDefinitions.length > 0) {
+      setPreviewCharacters(theme.characterDefinitions);
+      setState(prev => ({ ...prev, currentTheme: theme }));
+      setView('series-preview');
+
+      // Still fetch in background to get latest images/details if needed
+      const creatorId = (theme as any).createdBy || (theme as any).creatorId;
+      getThemeCharacters(creatorId, theme.id).then(chars => {
+        setPreviewCharacters(chars);
+      });
+      return;
+    }
+
     setLoading(true);
     setLoadingMsg(`Loading figurines for ${theme.name}...`);
     try {
@@ -673,6 +782,7 @@ const App: React.FC = () => {
                     </div>
                     <h3 className="text-xl font-black mb-1">{theme.name}</h3>
                     <p className="text-[9px] font-black uppercase text-emerald-500 mb-6">By {theme.creatorName}</p>
+
                     <div className="flex gap-2 w-full">
                       <button onClick={() => handleViewSeries(theme)} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-stone-200 transition-colors">View</button>
                       <button onClick={() => handleOpenBox(theme)} className="flex-1 bg-emerald-400 py-3.5 rounded-xl font-black text-[9px] uppercase">Buy (100)</button>
@@ -681,6 +791,77 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {view === 'manufacturing' && state.currentTheme && (
+          <div className="space-y-16 py-10 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+            <div className="text-center space-y-6">
+              <div className="inline-flex items-center gap-3 px-6 py-2 bg-emerald-50 rounded-full border border-emerald-100 mb-4">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Production Suite Active</span>
+              </div>
+              <h2 className="text-7xl font-black tracking-tighter leading-[0.9]">Crafting "{state.currentTheme.name}"</h2>
+              <p className="text-stone-400 text-xl font-light max-w-2xl mx-auto leading-relaxed">
+                The Lab is generating your series figurines. Please wait for the production cycle to complete.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              {state.currentTheme.characterDefinitions.map((char, i) => {
+                const isBuilding = activeStep === i && isProducing;
+                const isDone = !!char.imageUrl;
+                const isPending = !isDone && !isBuilding;
+
+                return (
+                  <div key={i} className={`group relative bg-white rounded-[2.5rem] p-6 shadow-xl border transition-all duration-700 overflow-hidden ${isBuilding ? 'border-emerald-200 scale-105 shadow-emerald-100/50' : 'border-stone-50 opacity-90'}`}>
+                    {/* Status Badge */}
+                    <div className="absolute top-6 right-8">
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${isDone ? 'bg-emerald-50 text-emerald-500' :
+                        isBuilding ? 'bg-amber-50 text-amber-500 animate-pulse' :
+                          'bg-stone-50 text-stone-300'
+                        }`}>
+                        {isDone ? 'Completed' : isBuilding ? 'Building...' : 'Pending'}
+                      </span>
+                    </div>
+
+                    {/* Figurine Preview */}
+                    <div className={`aspect-square rounded-[1.5rem] overflow-hidden mb-6 shadow-inner border flex items-center justify-center relative transition-all duration-700 ${isDone ? 'bg-white border-stone-100 shadow-emerald-50' : 'bg-stone-50 border-dashed border-stone-200'}`}>
+                      {isDone ? (
+                        <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover animate-in zoom-in duration-1000" />
+                      ) : isBuilding ? (
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="w-16 h-16 border-4 border-stone-100 border-t-emerald-500 rounded-full animate-spin"></div>
+                          <Cpu className="w-8 h-8 text-emerald-200 absolute animate-pulse" />
+                        </div>
+                      ) : (
+                        <Package className="w-12 h-12 text-stone-200" />
+                      )}
+                    </div>
+
+                    <h3 className={`text-2xl font-black tracking-tight mb-2 transition-colors duration-500 ${isDone ? 'text-stone-900' : 'text-stone-300'}`}>
+                      {char.name}
+                    </h3>
+                    <p className={`text-sm leading-relaxed transition-colors duration-500 line-clamp-2 ${isDone ? 'text-stone-500' : 'text-stone-300'}`}>
+                      {isDone ? char.description : "Awaiting production cycle..."}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {!isProducing && activeStep >= 6 && (
+              <div className="flex flex-col items-center pt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <button
+                  onClick={() => setView('marketplace')}
+                  className="bg-stone-900 text-white px-20 py-8 rounded-[2.5rem] font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-4 group"
+                >
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400 group-hover:scale-125 transition-transform" />
+                  View in Marketplace
+                </button>
+                <p className="mt-6 text-stone-400 font-bold uppercase tracking-widest text-[10px]">Production Run Successful</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -757,17 +938,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-10 lg:pt-16">
-              <section className="bg-white rounded-[3rem] p-10 shadow-xl border border-stone-50">
-                <h3 className="text-xl font-black mb-6 flex items-center gap-2">
-                  <Video className="w-5 h-5 text-emerald-400" /> Cinematic Reveal
-                </h3>
-                <div className="grid grid-cols-2 gap-5">
-                  <button onClick={() => handleAnimate('16:9')} className="bg-stone-50 hover:bg-stone-100 p-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] border border-stone-100">Landscape</button>
-                  <button onClick={() => handleAnimate('9:16')} className="bg-stone-50 hover:bg-stone-100 p-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] border border-stone-100">Portrait</button>
-                </div>
-              </section>
-            </div>
           </div>
         )}
         {view === 'series-preview' && state.currentTheme && (
@@ -816,12 +986,7 @@ const App: React.FC = () => {
                         <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[2px]"></div>
                       )}
                     </div>
-                    <h3 className="text-2xl font-black tracking-tight mb-2 text-stone-400 group-hover:text-stone-900 transition-colors">
-                      {char.imageUrl ? char.name : `Figurine #${i + 1}`}
-                    </h3>
-                    <p className="text-stone-300 group-hover:text-stone-500 text-sm leading-relaxed transition-colors line-clamp-2">
-                      {char.description || "Unbox to reveal this character's story and unique traits."}
-                    </p>
+                    <div className="h-6 w-full"></div>
                   </div>
                 ))
               ) : (

@@ -153,14 +153,14 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, onCom
             {/* Hero Text */}
             <div className="absolute -bottom-48 left-1/2 -translate-x-1/2 text-center w-[500px] space-y-6 z-20">
               <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-emerald-400">Legendary Find unlocked</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-emerald-400">{character.rarity} find unlocked</span>
                 <h2 className="text-7xl font-black text-white tracking-tighter drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] leading-none italic">{character.name}</h2>
               </div>
 
               <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur-3xl px-10 py-4 rounded-full border border-white/20 shadow-2xl">
                 <div className={`w-3 h-3 rounded-full animate-pulse ${character.rarity === 'Legendary' ? 'bg-rose-400 shadow-[0_0_15px_rgba(251,113,133,0.8)]' :
-                    character.rarity === 'Rare' ? 'bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.8)]' :
-                      'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]'
+                  character.rarity === 'Rare' ? 'bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.8)]' :
+                    'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]'
                   }`}></div>
                 <span className="text-xs font-black uppercase tracking-widest text-white">
                   {character.rarity} EDITION

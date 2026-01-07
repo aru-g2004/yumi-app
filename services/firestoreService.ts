@@ -133,6 +133,11 @@ export const saveTheme = async (
         createdAt: serverTimestamp(),
         createdBy: userId,
         characterCount: theme.characterDefinitions?.length || 0,
+        characterDefinitions: theme.characterDefinitions?.map(d => ({
+            name: d.name,
+            rarity: d.rarity,
+            description: d.description
+        })) || [],
         isPublic: isPublic,
         blindBoxPrice: 100,
         totalPurchases: 0
@@ -157,6 +162,34 @@ export const saveTheme = async (
     await updateDoc(userRef, {
         'stats.themesCreated': increment(1)
     });
+};
+
+/**
+ * Delete theme and all its characters (Rollback/Cleanup)
+ */
+export const deleteTheme = async (userId: string, themeId: string): Promise<void> => {
+    const batch = writeBatch(db);
+
+    // 1. Delete from user themes
+    const themeRef = doc(db, 'users', userId, 'themes', themeId);
+    batch.delete(themeRef);
+
+    // 2. Delete from public themes
+    const publicThemeRef = doc(db, 'public_themes', themeId);
+    batch.delete(publicThemeRef);
+
+    // 3. Delete characters subcollection
+    const charactersRef = collection(db, 'users', userId, 'themes', themeId, 'characters');
+    const charactersSnapshot = await getDocs(charactersRef);
+    charactersSnapshot.docs.forEach(d => batch.delete(d.ref));
+
+    // 4. Decrement user stats
+    const userRef = doc(db, 'users', userId, 'profile', 'data');
+    batch.update(userRef, {
+        'stats.themesCreated': increment(-1)
+    });
+
+    await batch.commit();
 };
 
 /**
@@ -231,8 +264,15 @@ export const getUserThemes = async (userId: string): Promise<CollectionTheme[]> 
             description: themeData.description,
             visualStyle: themeData.visualStyle,
             boxImageUrl: themeData.boxImageUrl,
+            keywords: themeData.keywords || '',
+            colorScheme: themeData.colorScheme || [],
+            toyFinish: themeData.toyFinish || '',
+            variationHint: themeData.variationHint || '',
+            inspirationImages: themeData.inspirationImages || [],
+            rareTraits: themeData.rareTraits || '',
+            legendaryTraits: themeData.legendaryTraits || '',
             characterDefinitions
-        });
+        } as CollectionTheme);
     }
 
     return themes;
