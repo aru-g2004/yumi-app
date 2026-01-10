@@ -323,9 +323,6 @@ const App: React.FC = () => {
         description: d.description || `A unique character from the ${theme.name} series.`
       }));
 
-      setLoadingMsg('Rendering visual packaging...');
-      const boxArt = await generateBoxArt(user.id, theme.id, theme.name, theme.visualStyle, user.studioName);
-
       // Template Seeding: If using a template, fetch its characters to find a baseline
       let seedBaselineData = '';
       if ((advancedData as any).id && (advancedData as any).creatorId) {
@@ -344,13 +341,12 @@ const App: React.FC = () => {
       const finalTheme: CollectionTheme = {
         ...theme,
         ...advancedData,
-        boxImageUrl: boxArt,
-        id: theme.id, // Ensure we keep the AI-generated ID
+        boxImageUrl: '', // Will be generated after production
+        id: theme.id,
         characterDefinitions: theme.characterDefinitions.map((aiDef, i) => {
           const userDef = advancedData.characterDefinitions?.[i];
           return {
             ...aiDef,
-            // Only use user input if it's not just whitespace
             name: userDef?.name?.trim() ? userDef.name.trim() : aiDef.name,
             description: userDef?.description?.trim() ? userDef.description.trim() : aiDef.description,
           };
@@ -497,8 +493,26 @@ const App: React.FC = () => {
       return;
     }
 
+    // 5. Finalize Box Art
+    try {
+      setLoadingMsg('Rendering visual packaging...');
+      const boxArt = await generateBoxArt(user.id, theme.id, theme.name, theme.visualStyle, user.studioName);
+
+      // 6. Final state and DB update
+      const updatedTheme = { ...theme, boxImageUrl: boxArt, characterDefinitions: sortedDefs };
+      await saveTheme(user.id, updatedTheme, true);
+
+      setState(prev => ({
+        ...prev,
+        currentTheme: updatedTheme,
+        publicThemes: prev.publicThemes.map(t => t.id === theme.id ? { ...t, boxImageUrl: boxArt } : t)
+      }));
+    } catch (boxErr) {
+      console.error('[Box Art Failure]', boxErr);
+    }
+
     setIsProducing(false);
-    setActiveStep(6);
+    setActiveStep(7); // Mark as complete
 
     // After completion, reload theme data to ensure sync
     if (user) {
@@ -540,7 +554,11 @@ const App: React.FC = () => {
 
       const def = await purchaseBlindBox(user.id, targetTheme.id, creatorId, 100);
 
-      const themeToUse = { ...targetTheme };
+      // Fetch all theme characters for the collection view in the opener
+      const chars = await getThemeCharacters(creatorId, targetTheme.id);
+      setPreviewCharacters(chars);
+
+      const themeToUse = { ...targetTheme, characterDefinitions: chars };
 
       // 2. Visual handling
       let finalImageUrl = def.imageUrl;
@@ -679,7 +697,15 @@ const App: React.FC = () => {
   if (view === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
 
   if (view === 'opening' && unboxingChar && unboxingTheme) {
-    return <BlindBoxOpener character={unboxingChar} theme={unboxingTheme} onComplete={onUnboxingComplete} />;
+    return (
+      <BlindBoxOpener
+        character={unboxingChar}
+        theme={unboxingTheme}
+        themeCharacters={previewCharacters}
+        userCollection={state.collection}
+        onComplete={onUnboxingComplete}
+      />
+    );
   }
 
   return (
@@ -776,12 +802,12 @@ const App: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {state.publicThemes.map((theme) => (
-                  <div key={theme.id} className="bg-white rounded-[2.5rem] p-5 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 flex flex-col items-center text-center h-[420px]">
-                    <div className="w-full aspect-square bg-stone-50 rounded-[2rem] overflow-hidden mb-3 flex items-center justify-center">
+                  <div key={theme.id} className="bg-white rounded-[2.5rem] p-5 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 flex flex-col items-center text-center h-[400px]">
+                    <div className="w-full aspect-square bg-stone-50 rounded-[2rem] overflow-hidden mb-2 flex items-center justify-center">
                       <img src={theme.boxImageUrl} className="w-full h-full object-contain" alt={theme.name} />
                     </div>
                     <div className="flex flex-col flex-1 justify-between w-full h-full">
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         <h3
                           className="font-black leading-tight mb-1 overflow-hidden"
                           style={{
@@ -990,26 +1016,42 @@ const App: React.FC = () => {
 
               {/* Right: Character Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                {(previewCharacters.length > 0 ? previewCharacters : Array(6).fill(null)).map((char, i) => (
-                  <div key={i} className="group aspect-square bg-white rounded-[2.5rem] shadow-xl border border-stone-50 hover:scale-[1.05] transition-all duration-500 overflow-hidden relative flex items-center justify-center p-4">
-                    {char?.imageUrl ? (
-                      <img
-                        src={char.imageUrl}
-                        alt={char.name || `Figurine #${i + 1}`}
-                        className="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <Package className="w-6 h-6 text-stone-200" />
-                        <span className="text-[7px] font-black uppercase tracking-widest text-stone-300">Classified</span>
+                {(previewCharacters.length > 0 ? previewCharacters : Array(6).fill(null)).map((char, i) => {
+                  const isCollected = state.collection.some(c => c.name === char?.name && c.themeId === (state.currentTheme?.id || char?.themeId));
+                  return (
+                    <div key={i} className="group relative flex flex-col gap-3">
+                      <div className="aspect-square bg-white rounded-[2.5rem] shadow-xl border border-stone-50 hover:scale-[1.05] transition-all duration-500 overflow-hidden relative flex items-center justify-center p-4">
+                        {char?.imageUrl ? (
+                          <img
+                            src={char.imageUrl}
+                            alt={char.name || `Figurine #${i + 1}`}
+                            className={`w-full h-full object-cover transition-all duration-700 scale-110 group-hover:scale-100 rounded-[2rem] ${isCollected ? 'grayscale-0' : 'grayscale opacity-40'
+                              } ${isCollected ? 'group-hover:grayscale-0' : ''}`}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2">
+                            <Package className="w-6 h-6 text-stone-200" />
+                            <span className="text-[7px] font-black uppercase tracking-widest text-stone-300">Classified</span>
+                          </div>
+                        )}
+                        {/* Mystery Overlay */}
+                        {(!char || !char.imageUrl || !isCollected) && (
+                          <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[1px]"></div>
+                        )}
                       </div>
-                    )}
-                    {/* Mystery Overlay */}
-                    {(!char || !char.imageUrl) && (
-                      <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[1px]"></div>
-                    )}
-                  </div>
-                ))}
+
+                      {char?.name && (
+                        <div className="px-2 text-center">
+                          <p className="text-[10px] font-black tracking-tight text-stone-900 truncate mb-0.5">{char.name}</p>
+                          <p className={`text-[8px] font-black uppercase tracking-widest ${char.rarity === 'Legendary' ? 'text-rose-500' :
+                            char.rarity === 'Rare' ? 'text-amber-500' :
+                              'text-emerald-500'
+                            }`}>{char.rarity}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
