@@ -12,7 +12,7 @@ const SEGMENTS = [
     { value: 100, color: 'bg-stone-300' },
     { value: 500, color: 'bg-rose-300' },
     { value: 100, color: 'bg-stone-200' },
-    { value: 1000, color: 'bg-amber-300' },
+    { value: 200, color: 'bg-amber-300' },
     { value: 50, color: 'bg-stone-300' },
     { value: 300, color: 'bg-emerald-300' },
 ];

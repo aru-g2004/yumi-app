@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Confetti from 'react-confetti';
 import {
   Package,
   LayoutGrid,
   Coins,
+  ChevronDown,
   PlusCircle,
   Sparkles,
   Wand2,
@@ -24,8 +26,11 @@ import {
   AlertTriangle,
   Factory,
   Cpu,
+  Search,
   Store,
-  Trophy
+  Trophy,
+  HelpCircle,
+  LogOut
 } from 'lucide-react';
 import { AppState, AppView, Character, CollectionTheme, User } from './types';
 import {
@@ -59,7 +64,8 @@ import {
   purchaseBlindBox,
   getThemeCharacters,
   updateLastSpin,
-  deleteTheme
+  deleteTheme,
+  markCollectionComplete
 } from './services/firestoreService';
 
 const PRESET_THEMES = [
@@ -96,12 +102,29 @@ const App: React.FC = () => {
   const [unboxingChar, setUnboxingChar] = useState<Character | null>(null);
   const [unboxingTheme, setUnboxingTheme] = useState<CollectionTheme | null>(null);
 
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCreator, setFilterCreator] = useState('');
+
+  // Unboxing & Batch State
+  const [unboxingQueue, setUnboxingQueue] = useState<Character[]>([]);
+  const [purchaseModalTheme, setPurchaseModalTheme] = useState<CollectionTheme | null>(null);
+  const [purchaseQuantity, setPurchaseQuantity] = useState(1);
+
   // Production states
   const [activeStep, setActiveStep] = useState(0); // 0-5 for characters
   const [isProducing, setIsProducing] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const [previewCharacters, setPreviewCharacters] = useState<any[]>([]);
+
+  // Completion & Celebration State
+  const [completedCollections, setCompletedCollections] = useState<string[]>([]);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+  // Profile Dropdown State
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   // Stable reference for tracking server-side coin changes
   const lastCoinValue = useRef<number | null>(null);
@@ -177,6 +200,9 @@ const App: React.FC = () => {
             publicThemes: publicThemes
           }));
 
+          // Load completed collections
+          setCompletedCollections(profile?.completedCollections || []);
+
           if (profile?.hasOnboarded) {
             setView('marketplace');
           } else {
@@ -209,6 +235,27 @@ const App: React.FC = () => {
   useEffect(() => {
     checkApiKey().then(hasKey => setApiKeySelected(hasKey));
   }, []);
+
+  // Window resize listener for Confetti
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Click outside to close profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showProfileDropdown && !target.closest('.profile-dropdown-container')) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileDropdown]);
 
   const handleLogout = () => {
     signOut(auth).then(() => {
@@ -534,60 +581,171 @@ const App: React.FC = () => {
     }
   };
 
-  const handleOpenBox = async (targetTheme: CollectionTheme = state.currentTheme!) => {
-    if (!targetTheme || state.coins < 100) return;
+  const handleOpenBox = (targetTheme: CollectionTheme = state.currentTheme!) => {
+    if (!targetTheme) return;
     if (!user) {
       setGlobalError('You must be logged in to unbox characters');
       return;
     }
+    setPurchaseModalTheme(targetTheme);
+    setPurchaseQuantity(1);
+  };
 
+  const executeBatchPurchase = async () => {
+    if (!purchaseModalTheme || !user) return;
+    const totalCost = purchaseQuantity * 100;
+
+    if (state.coins < totalCost) {
+      setGlobalError(`Insufficient coins. You need ${totalCost} coins.`);
+      return;
+    }
+
+    setPurchaseModalTheme(null); // Close modal
     setLoading(true);
-    setLoadingMsg('Unboxing your surprise...');
+    setLoadingMsg(purchaseQuantity > 1 ? `Preparing ${purchaseQuantity} boxes...` : 'Unboxing your surprise...');
 
     try {
-      const creatorId = (targetTheme as any).createdBy || (targetTheme as any).creatorId;
-      if (!creatorId) throw new Error('Creator ID not found for this theme');
+      const creatorId = (purchaseModalTheme as any).createdBy || (purchaseModalTheme as any).creatorId;
+      if (!creatorId) throw new Error('Creator ID not found');
 
-      // 1. Transaction & Selection (Deducts from buyer, adds to seller)
-      // Update local coins immediately for responsive UI and to prevent notification sync race
-      setState(prev => ({ ...prev, coins: prev.coins - 100 }));
+      // Deduct coins locally
+      setState(prev => ({ ...prev, coins: prev.coins - totalCost }));
 
-      const def = await purchaseBlindBox(user.id, targetTheme.id, creatorId, 100);
+      const newQueue: Character[] = [];
+      const themeChars = await getThemeCharacters(creatorId, purchaseModalTheme.id);
+      setPreviewCharacters(themeChars);
 
-      // Fetch all theme characters for the collection view in the opener
-      const chars = await getThemeCharacters(creatorId, targetTheme.id);
-      setPreviewCharacters(chars);
+      const themeToUse = { ...purchaseModalTheme, characterDefinitions: themeChars };
 
-      const themeToUse = { ...targetTheme, characterDefinitions: chars };
+      // Batch purchase loop
+      for (let i = 0; i < purchaseQuantity; i++) {
+        const def = await purchaseBlindBox(user.id, purchaseModalTheme.id, creatorId, 100);
 
-      // 2. Visual handling
-      let finalImageUrl = def.imageUrl;
-      if (!finalImageUrl) {
-        setLoadingMsg('Rendering character image...');
-        finalImageUrl = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, imageSize);
+        let finalImageUrl = def.imageUrl;
+        if (!finalImageUrl) {
+          // Generate if missing (rare case in production)
+          finalImageUrl = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, '1K');
+        }
+
+        newQueue.push({
+          id: Math.random().toString(36).substr(2, 9),
+          name: def.name,
+          description: def.description || '',
+          rarity: def.rarity,
+          imageUrl: finalImageUrl,
+          theme: themeToUse.name,
+          themeId: themeToUse.id,
+          themeCreatorId: creatorId,
+          obtainedAt: Date.now(),
+          count: 1
+        });
       }
 
-      const newChar: Character = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: def.name,
-        description: def.description || '',
-        rarity: def.rarity,
-        imageUrl: finalImageUrl,
-        theme: themeToUse.name,
-        themeId: themeToUse.id,
-        themeCreatorId: creatorId,
-        obtainedAt: Date.now(),
-        count: 1
-      };
+      // Start Opening Flow
+      const firstChar = newQueue[0];
+      const remainingQueue = newQueue.slice(1);
 
-      setUnboxingChar(newChar);
+      setUnboxingChar(firstChar);
       setUnboxingTheme(themeToUse);
+      setUnboxingQueue(remainingQueue);
       setView('opening');
+
     } catch (error) {
-      await handleError(error);
+      handleError(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleNextBox = async () => {
+    if (!unboxingChar || !user) return;
+
+    // 1. Save current character
+    await saveUnboxingChar(unboxingChar);
+
+    // 2. Load next
+    if (unboxingQueue.length > 0) {
+      const nextChar = unboxingQueue[0];
+      const remaining = unboxingQueue.slice(1);
+      setUnboxingChar(nextChar); // Trigger re-render of Opener with new char
+      setUnboxingQueue(remaining);
+    } else {
+      // Should not happen if button logic is correct, but safe fallback
+      setView('collection');
+    }
+  };
+
+  const saveUnboxingChar = async (char: Character) => {
+    if (!char || !user || !unboxingTheme) return;
+    const themeToUse = unboxingTheme;
+    const creatorId = (themeToUse as any).createdBy || (themeToUse as any).creatorId || user.id;
+    const creatorName = (themeToUse as any).creatorName || user.studioName || user.name;
+
+    await addToCollection(user.id, char, themeToUse.id, creatorId, creatorName);
+
+    // Update local state
+    setState(prev => {
+      const existingIndex = prev.collection.findIndex(c => c.name === char.name && c.theme === char.theme);
+      let newCollection = [...prev.collection];
+
+      if (existingIndex >= 0) {
+        newCollection[existingIndex] = { ...newCollection[existingIndex], count: (newCollection[existingIndex].count || 1) + 1, obtainedAt: Date.now() };
+      } else {
+        newCollection = [char, ...newCollection];
+      }
+      return { ...prev, collection: newCollection, activeCharacter: char };
+    });
+
+    // Check for collection completion
+    try {
+      const allThemeChars = await getThemeCharacters(creatorId, themeToUse.id);
+      const userThemeChars = state.collection.filter(c => c.themeId === themeToUse.id);
+
+      // Add the current character if it's new
+      const isNew = !state.collection.some(c => c.name === char.name && c.themeId === themeToUse.id);
+      const totalCollected = isNew ? userThemeChars.length + 1 : userThemeChars.length;
+
+      const totalChars = allThemeChars.length;
+      const isComplete = totalCollected === totalChars;
+      const alreadyMarkedComplete = completedCollections.includes(themeToUse.id);
+
+      if (isComplete && !alreadyMarkedComplete) {
+        // Mark as complete in database
+        await markCollectionComplete(user.id, themeToUse.id);
+        setCompletedCollections(prev => [...prev, themeToUse.id]);
+
+        // Award 250 coins
+        await updateUserCoins(user.id, 250);
+
+        // Trigger confetti
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 6000);
+
+        // Show notification
+        setNotification('🎉 Collection Complete! +250 Coins');
+        setTimeout(() => setNotification(null), 5000);
+      }
+    } catch (error) {
+      console.error('Error checking collection completion:', error);
+    }
+  };
+
+  const onUnboxingComplete = async () => {
+    // Save current
+    if (unboxingChar) await saveUnboxingChar(unboxingChar);
+
+    // Auto-collect remaining queue if any (to prevent data loss)
+    if (unboxingQueue.length > 0) {
+      setLoading(true); // brief visual feedback handling leftovers
+      for (const char of unboxingQueue) {
+        await saveUnboxingChar(char);
+      }
+      setLoading(false);
+    }
+
+    setUnboxingChar(null);
+    setUnboxingQueue([]);
+    setView('collection');
   };
 
 
@@ -621,44 +779,7 @@ const App: React.FC = () => {
     }
   };
 
-  const onUnboxingComplete = async () => {
-    const themeToUse = unboxingTheme || state.currentTheme;
-    if (!unboxingChar || !user || !themeToUse) return;
 
-    try {
-      const creatorId = (themeToUse as any).createdBy || (themeToUse as any).creatorId || user.id;
-      const creatorName = (themeToUse as any).creatorName || user.name;
-
-      await addToCollection(user.id, unboxingChar, themeToUse.id, creatorId, creatorName);
-
-      setState(prev => {
-        const existingIndex = prev.collection.findIndex(c => c.name === unboxingChar.name && c.theme === unboxingChar.theme);
-        let newCollection = [...prev.collection];
-
-        if (existingIndex >= 0) {
-          const existing = newCollection[existingIndex];
-          newCollection[existingIndex] = {
-            ...existing,
-            count: (existing.count || 1) + 1,
-            obtainedAt: Date.now()
-          };
-        } else {
-          newCollection = [unboxingChar, ...newCollection];
-        }
-
-        return {
-          ...prev,
-          collection: newCollection,
-          activeCharacter: unboxingChar
-        };
-      });
-
-      setUnboxingChar(null);
-      setView('collection');
-    } catch (error) {
-      handleError(error);
-    }
-  };
 
   const renderLoading = () => (
     <div className="fixed inset-0 bg-stone-50/95 backdrop-blur-xl z-[60] flex flex-col items-center justify-center">
@@ -696,21 +817,136 @@ const App: React.FC = () => {
 
   if (view === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
 
+  const handleBuyAnother = async () => {
+    if (!unboxingTheme || !user) return;
+
+    // 1. Save the CURRENT character before moving on, otherwise it won't show as collected in the next screen's legend
+    if (unboxingChar) {
+      await saveUnboxingChar(unboxingChar);
+    }
+
+    if (state.coins < 100) {
+      setNotification('Insufficient coins!');
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    setLoading(true);
+    setLoadingMsg('Opening another box...');
+
+    // Deduct immediately and notify
+    setState(prev => ({ ...prev, coins: prev.coins - 100 }));
+    setNotification('-100 Coins');
+    setTimeout(() => setNotification(null), 3000);
+
+    try {
+      const creatorId = (unboxingTheme as any).createdBy || (unboxingTheme as any).creatorId;
+      const def = await purchaseBlindBox(user.id, unboxingTheme.id, creatorId, 100);
+
+      let finalImageUrl = def.imageUrl;
+      if (!finalImageUrl) {
+        const themeToUse = unboxingTheme; // reuse existing full theme object
+        finalImageUrl = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, '1K');
+      }
+
+      const newChar: Character = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: def.name,
+        description: def.description || '',
+        rarity: def.rarity,
+        imageUrl: finalImageUrl,
+        theme: unboxingTheme.name,
+        themeId: unboxingTheme.id,
+        themeCreatorId: creatorId,
+        obtainedAt: Date.now(),
+        count: 1
+      };
+
+      // Reset opener state by clearing char briefly or just setting new one
+      // To be safe and ensure animation replay, we rely on the `key` prop in the render
+      setUnboxingChar(newChar);
+      // Queue remains empty as this is a single ad-hoc buy
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (view === 'opening' && unboxingChar && unboxingTheme) {
     return (
       <BlindBoxOpener
+        key={unboxingChar.id} // Force re-mount on character change to reset animation state
         character={unboxingChar}
         theme={unboxingTheme}
         themeCharacters={previewCharacters}
         userCollection={state.collection}
         onComplete={onUnboxingComplete}
+        onNext={handleNextBox}
+        onBuyMore={handleBuyAnother}
+        hasNext={unboxingQueue.length > 0}
+        currentCoins={state.coins}
       />
     );
   }
 
+  // --- Purchase Modal ---
+  const renderPurchaseModal = () => {
+    if (!purchaseModalTheme) return null;
+    return (
+      <div className="fixed inset-0 z-[80] bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl scale-100 animate-in zoom-in-95 duration-300">
+          <div className="text-center space-y-2 mb-8">
+            <h3 className="text-2xl font-black tracking-tight text-stone-900">Purchase Blind Boxes</h3>
+            <p className="text-stone-500 font-medium">{purchaseModalTheme.name}</p>
+          </div>
+
+          <div className="flex items-center justify-center gap-6 mb-8">
+            <button
+              onClick={() => setPurchaseQuantity(Math.max(1, purchaseQuantity - 1))}
+              className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center hover:bg-stone-200 transition-colors"
+            >
+              <span className="text-2xl font-black text-stone-600">-</span>
+            </button>
+
+            <div className="flex flex-col items-center w-24">
+              <span className="text-4xl font-black text-stone-900">{purchaseQuantity}</span>
+              <span className="text-xs font-black uppercase text-stone-400 tracking-wider">BOXES</span>
+            </div>
+
+            <button
+              onClick={() => setPurchaseQuantity(Math.min(10, purchaseQuantity + 1))}
+              className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center hover:bg-stone-200 transition-colors"
+            >
+              <span className="text-2xl font-black text-stone-600">+</span>
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={executeBatchPurchase}
+              className="w-full bg-stone-900 text-white py-4 rounded-2xl font-black text-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              Pay <span className="text-emerald-400">{purchaseQuantity * 100} Coins</span>
+            </button>
+
+
+            <button
+              onClick={() => setPurchaseModalTheme(null)}
+              className="w-full bg-white text-stone-400 py-3 rounded-2xl font-black text-sm hover:bg-stone-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen pb-32 bg-[#faf9f6] text-stone-900">
       {loading && renderLoading()}
+      {renderPurchaseModal()}
       {renderGlobalError()}
 
       {notification && (
@@ -719,6 +955,17 @@ const App: React.FC = () => {
           <span className="font-black text-xs uppercase tracking-widest">{notification}</span>
         </div>
       )}
+
+      {/* Confetti Celebration */}
+      {showConfetti && (
+        <Confetti
+          width={windowSize.width}
+          height={windowSize.height}
+          recycle={false}
+          numberOfPieces={500}
+        />
+      )}
+
       {showSpin && <SpinWheel
         onWin={async (amount) => {
           setShowSpin(false);
@@ -770,7 +1017,32 @@ const App: React.FC = () => {
             <Trophy className="w-5 h-5" />
           </button>
           {user && (
-            <img src={user.picture} alt={user.name} onClick={handleLogout} className="w-10 h-10 rounded-full border-2 border-white shadow-md cursor-pointer hover:scale-105 transition-transform" />
+            <div className="relative profile-dropdown-container">
+              <img
+                src={user.picture}
+                alt={user.name}
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="w-10 h-10 rounded-full border-2 border-white shadow-md cursor-pointer hover:scale-105 transition-transform"
+              />
+              {showProfileDropdown && (
+                <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-stone-100 w-48 overflow-hidden z-50">
+                  <div className="p-4 border-b border-stone-100">
+                    <p className="font-bold text-sm text-stone-900 truncate">{user.name}</p>
+                    <p className="text-[10px] text-stone-400 truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowProfileDropdown(false);
+                      handleLogout();
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-stone-50 transition-colors flex items-center gap-3 text-stone-600 hover:text-rose-600"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="font-medium text-sm">Log Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           <button onClick={handleApiKeyPrompt} className={`p-2.5 rounded-full transition-all ${apiKeySelected ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}>
             <Settings className="w-5 h-5" />
@@ -799,37 +1071,89 @@ const App: React.FC = () => {
               <div className="text-center space-y-4">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 block">World Market</span>
                 <h2 className="text-6xl font-black tracking-tighter">Community Collections</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {state.publicThemes.map((theme) => (
-                  <div key={theme.id} className="bg-white rounded-[2.5rem] p-5 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 flex flex-col items-center text-center h-[400px]">
-                    <div className="w-full aspect-square bg-stone-50 rounded-[2rem] overflow-hidden mb-2 flex items-center justify-center">
-                      <img src={theme.boxImageUrl} className="w-full h-full object-contain" alt={theme.name} />
-                    </div>
-                    <div className="flex flex-col flex-1 justify-between w-full h-full">
-                      <div className="space-y-0.5">
-                        <h3
-                          className="font-black leading-tight mb-1 overflow-hidden"
-                          style={{
-                            fontSize: theme.name.length > 20 ? '1.1rem' : theme.name.length > 12 ? '1.4rem' : '1.7rem',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            minHeight: '3rem'
-                          }}
-                        >
-                          {theme.name}
-                        </h3>
-                        <p className="text-[9px] font-black uppercase text-emerald-500">By {theme.creatorName}</p>
-                      </div>
 
-                      <div className="flex w-full">
-                        <button onClick={() => handleViewSeries(theme)} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-stone-200 transition-colors">View</button>
-                        <button onClick={() => handleOpenBox(theme)} className="flex-1 bg-emerald-400 py-3.5 rounded-xl font-black text-[9px] uppercase">Buy (100)</button>
+                {/* Search and Filter Panel */}
+                <div className="flex flex-wrap items-center justify-center gap-4 pt-4 max-w-2xl mx-auto">
+                  <div className="relative flex-1 min-w-[200px] group">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-300 group-focus-within:text-stone-900 transition-colors" />
+                    <input
+                      type="text"
+                      placeholder="Search collections..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-white border-2 border-stone-100 rounded-full pl-14 pr-6 py-4 font-bold text-sm outline-none focus:border-stone-900 text-stone-900 transition-all shadow-sm placeholder:text-stone-300"
+                    />
+                  </div>
+
+                  <div className="relative min-w-[180px]">
+                    <select
+                      value={filterCreator}
+                      onChange={(e) => setFilterCreator(e.target.value)}
+                      className="w-full appearance-none bg-white border-2 border-stone-100 rounded-full pl-6 pr-12 py-4 font-bold text-sm outline-none focus:border-stone-900 text-stone-900 transition-all shadow-sm cursor-pointer"
+                    >
+                      <option value="">All Design Studios</option>
+                      {Array.from(new Set(state.publicThemes.map(t => {
+                        // Consistent name logic: Use Studio Name for current user's themes
+                        if (user && t.creatorId === user.id && user.studioName) {
+                          return user.studioName;
+                        }
+                        return t.creatorName;
+                      }))).filter(Boolean).sort().map(creator => (
+                        <option key={creator} value={creator}>{creator}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {state.publicThemes
+                  .filter(theme => {
+                    const matchesSearch = theme.name.toLowerCase().includes(searchTerm.toLowerCase());
+                    // Calculate effective creator name to match filter
+                    const effectiveCreatorName = (user && theme.creatorId === user.id && user.studioName)
+                      ? user.studioName
+                      : theme.creatorName;
+
+                    const matchesCreator = filterCreator ? effectiveCreatorName === filterCreator : true;
+                    return matchesSearch && matchesCreator;
+                  })
+                  .map((theme) => (
+                    <div key={theme.id} className="bg-white rounded-[2.5rem] p-5 shadow-xl border border-stone-50 hover:scale-[1.02] transition-all duration-500 flex flex-col items-center text-center h-[400px]">
+                      <div className="w-full aspect-square bg-stone-50 rounded-[2rem] overflow-hidden mb-2 flex items-center justify-center">
+                        <img src={theme.boxImageUrl} className="w-full h-full object-contain" alt={theme.name} />
+                      </div>
+                      <div className="flex flex-col flex-1 justify-center gap-6 w-full h-full">
+                        <div className="space-y-0.5">
+                          <h3
+                            className="font-black leading-tight mb-1 overflow-hidden"
+                            style={{
+                              fontSize: theme.name.length > 20 ? '1.1rem' : theme.name.length > 12 ? '1.4rem' : '1.7rem',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              minHeight: '3rem'
+                            }}
+                          >
+                            {theme.name}
+                          </h3>
+                          <p className="text-[9px] font-black uppercase text-emerald-500">By {theme.creatorId === user?.id && user?.studioName ? user.studioName : theme.creatorName}</p>
+                        </div>
+
+                        <div className="flex w-full gap-2">
+                          <button onClick={() => handleViewSeries(theme)} className="flex-1 bg-stone-100 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-stone-200 transition-colors">View</button>
+                          {completedCollections.includes(theme.id) ? (
+                            <button disabled className="flex-1 bg-emerald-50 text-emerald-600 py-3.5 rounded-xl font-black text-[9px] uppercase cursor-not-allowed flex items-center justify-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> COMPLETE
+                            </button>
+                          ) : (
+                            <button onClick={() => handleOpenBox(theme)} className="flex-1 bg-emerald-400 py-3.5 rounded-xl font-black text-[9px] uppercase hover:bg-emerald-500 transition-colors">Buy (100)</button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -941,13 +1265,20 @@ const App: React.FC = () => {
                       } as any;
                     }
                     if (!themeDef) return null;
+                    const rarityOrder = { 'Common': 1, 'Rare': 2, 'Legendary': 3 };
+                    const chars = themeDef.characterDefinitions?.length > 0 ? themeDef.characterDefinitions :
+                      Array.from(new Set(ownedInTheme.map(c => c.name))).map(n => {
+                        const c = ownedInTheme.find(x => x.name === n)!;
+                        return { name: n, description: c.description, rarity: c.rarity };
+                      });
+
+                    const sortedChars = [...chars].sort((a, b) =>
+                      (rarityOrder[a.rarity as keyof typeof rarityOrder] || 99) - (rarityOrder[b.rarity as keyof typeof rarityOrder] || 99)
+                    );
+
                     const mergedDef = {
                       ...themeDef,
-                      characterDefinitions: themeDef.characterDefinitions?.length > 0 ? themeDef.characterDefinitions :
-                        Array.from(new Set(ownedInTheme.map(c => c.name))).map(n => {
-                          const c = ownedInTheme.find(x => x.name === n)!;
-                          return { name: n, description: c.description, rarity: c.rarity };
-                        })
+                      characterDefinitions: sortedChars
                     };
                     return <CharacterShelf key={tName} theme={mergedDef} ownedCharacters={ownedInTheme} onCharacterClick={c => { setState(p => ({ ...p, activeCharacter: c })); setView('tools'); }} />;
                   });
@@ -957,29 +1288,106 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {view === 'tools' && state.activeCharacter && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start animate-in slide-in-from-bottom-12 duration-700">
-            <div className="space-y-8">
-              <button onClick={() => setView('collection')} className="flex items-center gap-2 text-stone-400 font-bold hover:text-stone-900">
+        {view === 'tools' && state.activeCharacter && (() => {
+          const relatedChars = state.collection.filter(c => c.themeId === state.activeCharacter?.themeId && c.id !== state.activeCharacter?.id);
+          const obtainedDate = new Date(state.activeCharacter.obtainedAt).toLocaleDateString();
+
+          return (
+            <div className="space-y-8 animate-in slide-in-from-bottom-12 duration-700">
+              <button onClick={() => setView('collection')} className="flex items-center gap-2 text-stone-400 font-bold hover:text-stone-900 transition-colors">
                 <ChevronLeft className="w-5 h-5" /> Back to Shelf
               </button>
-              <div className="bg-white rounded-[4rem] p-10 shadow-2xl border border-stone-50 overflow-hidden relative group">
-                <div className="aspect-square rounded-[3rem] overflow-hidden bg-stone-50 mb-10 shadow-inner border border-stone-100">
-                  {state.activeCharacter.videoUrl ? (
-                    <video src={state.activeCharacter.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                  ) : (
-                    <img src={state.activeCharacter.imageUrl} alt={state.activeCharacter.name} className="w-full h-full object-cover" />
+
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                {/* Left: Character Image */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-[3rem] p-8 shadow-2xl border border-stone-50 sticky top-8">
+                    <div className="aspect-square rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-stone-50 to-stone-100 mb-6 shadow-inner border border-stone-100 relative group">
+                      {state.activeCharacter.videoUrl ? (
+                        <video src={state.activeCharacter.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={state.activeCharacter.imageUrl} alt={state.activeCharacter.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      )}
+                      <div className="absolute top-4 right-4 z-10">
+                        <span className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${state.activeCharacter.rarity === 'Legendary' ? 'bg-gradient-to-r from-rose-500 to-purple-600 text-white' :
+                          state.activeCharacter.rarity === 'Rare' ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white' :
+                            'bg-gradient-to-r from-emerald-400 to-teal-500 text-white'
+                          } shadow-lg`}>
+                          {state.activeCharacter.rarity}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-stone-50 rounded-2xl p-4 text-center">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">Obtained</p>
+                        <p className="text-sm font-bold text-stone-900">{obtainedDate}</p>
+                      </div>
+                      <div className="bg-stone-50 rounded-2xl p-4 text-center">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">Copies</p>
+                        <p className="text-sm font-bold text-stone-900">{state.activeCharacter.count || 1}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Character Info */}
+                <div className="lg:col-span-3 space-y-6">
+                  {/* Name & Description */}
+                  <div className="bg-white rounded-[3rem] p-8 shadow-2xl border border-stone-50">
+                    <div className="mb-6">
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-2 block">Character Profile</span>
+                      <h1 className="text-5xl font-black tracking-tight mb-2">{state.activeCharacter.name}</h1>
+                      <p className="text-stone-400 text-sm font-medium">{state.activeCharacter.theme}</p>
+                    </div>
+                    <div className="bg-stone-50 rounded-[2rem] p-6 border border-stone-100">
+                      <p className="text-stone-600 leading-relaxed">{state.activeCharacter.description}</p>
+                    </div>
+                  </div>
+
+                  {/* Related Characters */}
+                  {relatedChars.length > 0 && (
+                    <div className="bg-white rounded-[3rem] p-8 shadow-2xl border border-stone-50">
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-6">From Same Series ({relatedChars.length})</h3>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                        {relatedChars.slice(0, 10).map((char) => (
+                          <div
+                            key={char.id}
+                            onClick={() => setState(prev => ({ ...prev, activeCharacter: char }))}
+                            className="group cursor-pointer"
+                          >
+                            <div className="aspect-square rounded-2xl overflow-hidden bg-stone-50 border border-stone-100 hover:border-emerald-400 transition-all hover:shadow-lg mb-2">
+                              <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                            </div>
+                            <p className="text-[9px] font-bold text-stone-600 truncate text-center">{char.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
+
+                  {/* Series Info */}
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-[3rem] p-8 shadow-xl border border-emerald-100">
+                    <div className="flex items-start gap-6">
+                      <div className="flex-1">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-600 mb-2">Collection Series</h3>
+                        <p className="text-2xl font-black text-emerald-900 mb-3">{state.activeCharacter.theme}</p>
+                        <p className="text-sm text-emerald-700">
+                          You own {state.collection.filter(c => c.themeId === state.activeCharacter?.themeId).length} characters from this series
+                        </p>
+                      </div>
+                      <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 text-center min-w-[80px]">
+                        <p className="text-3xl font-black text-emerald-600">{state.collection.filter(c => c.themeId === state.activeCharacter?.themeId).length}</p>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-emerald-700 mt-1">Owned</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-4xl font-black tracking-tight">{state.activeCharacter.name}</h2>
-                  <span className="bg-stone-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">{state.activeCharacter.rarity}</span>
-                </div>
-                <p className="text-stone-500 text-lg leading-relaxed font-light p-8 bg-stone-50 rounded-[2.5rem] border border-stone-100">{state.activeCharacter.description}</p>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {view === 'series-preview' && state.currentTheme && (
           <div className="space-y-16 py-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
@@ -1016,42 +1424,72 @@ const App: React.FC = () => {
 
               {/* Right: Character Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                {(previewCharacters.length > 0 ? previewCharacters : Array(6).fill(null)).map((char, i) => {
-                  const isCollected = state.collection.some(c => c.name === char?.name && c.themeId === (state.currentTheme?.id || char?.themeId));
-                  return (
-                    <div key={i} className="group relative flex flex-col gap-3">
-                      <div className="aspect-square bg-white rounded-[2.5rem] shadow-xl border border-stone-50 hover:scale-[1.05] transition-all duration-500 overflow-hidden relative flex items-center justify-center p-4">
-                        {char?.imageUrl ? (
-                          <img
-                            src={char.imageUrl}
-                            alt={char.name || `Figurine #${i + 1}`}
-                            className={`w-full h-full object-cover transition-all duration-700 scale-110 group-hover:scale-100 rounded-[2rem] ${isCollected ? 'grayscale-0' : 'grayscale opacity-40'
-                              } ${isCollected ? 'group-hover:grayscale-0' : ''}`}
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center gap-2">
-                            <Package className="w-6 h-6 text-stone-200" />
-                            <span className="text-[7px] font-black uppercase tracking-widest text-stone-300">Classified</span>
+                {(() => {
+                  const safeChars = previewCharacters.length > 0 ? previewCharacters : Array(6).fill(null);
+                  // Sort by rarity: Common -> Rare -> Legendary
+                  const rarityOrder: Record<string, number> = { 'Common': 1, 'Rare': 2, 'Legendary': 3 };
+                  const sortedChars = [...safeChars].sort((a, b) => {
+                    if (!a || !b) return 0;
+                    return (rarityOrder[a.rarity as keyof typeof rarityOrder] || 99) - (rarityOrder[b.rarity as keyof typeof rarityOrder] || 99);
+                  });
+
+                  return sortedChars.map((char, i) => {
+                    const isCollected = state.collection.some(c => c.name === char?.name && c.themeId === (state.currentTheme?.id || char?.themeId));
+                    const isLegendary = char?.rarity === 'Legendary';
+                    const isMystery = isLegendary && !isCollected;
+
+                    return (
+                      <div key={i} className="group relative flex flex-col gap-3">
+                        <div className={`aspect-square bg-white rounded-[2.5rem] shadow-xl border border-stone-50 hover:scale-[1.05] transition-all duration-500 overflow-hidden relative flex items-center justify-center p-4 ${isMystery ? 'bg-stone-900 overflow-hidden' : ''}`}>
+                          {isMystery ? (
+                            <>
+                              {/* Colorful Translucent Gradient Background */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-white via-purple-100 to-purple-300 opacity-30"></div>
+                              <div className="absolute inset-0 backdrop-blur-md"></div>
+
+                              {/* Content */}
+                              <div className="relative z-10 flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-white to-purple-400 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                  <HelpCircle className="w-8 h-8 text-purple-600" strokeWidth={3} />
+                                </div>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-purple-600">Mystery</span>
+                              </div>
+                            </>
+                          ) : char?.imageUrl ? (
+                            <img
+                              src={char.imageUrl}
+                              alt={char.name || `Figurine #${i + 1}`}
+                              className={`w-full h-full object-cover transition-all duration-700 scale-110 group-hover:scale-100 rounded-[2rem] ${isCollected ? 'grayscale-0' : 'grayscale opacity-40'
+                                } ${isCollected ? 'group-hover:grayscale-0' : ''}`}
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center gap-2">
+                              <Package className="w-6 h-6 text-stone-200" />
+                              <span className="text-[7px] font-black uppercase tracking-widest text-stone-300">Classified</span>
+                            </div>
+                          )}
+
+                          {/* Mystery Overlay for non-legendary uncollected */}
+                          {(!char || (!char.imageUrl && !isMystery) || (!isCollected && !isMystery)) && (
+                            <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[1px]"></div>
+                          )}
+                        </div>
+
+                        {char?.name && (
+                          <div className="px-2 text-center">
+                            <p className={`text-[10px] font-black tracking-tight truncate mb-0.5 ${isMystery ? 'text-stone-300' : 'text-stone-900'}`}>
+                              {isMystery ? '???' : char.name}
+                            </p>
+                            <p className={`text-[8px] font-black uppercase tracking-widest ${char.rarity === 'Legendary' ? 'text-rose-500' :
+                              char.rarity === 'Rare' ? 'text-amber-500' :
+                                'text-emerald-500'
+                              }`}>{char.rarity}</p>
                           </div>
                         )}
-                        {/* Mystery Overlay */}
-                        {(!char || !char.imageUrl || !isCollected) && (
-                          <div className="absolute inset-0 bg-stone-900/5 backdrop-blur-[1px]"></div>
-                        )}
                       </div>
-
-                      {char?.name && (
-                        <div className="px-2 text-center">
-                          <p className="text-[10px] font-black tracking-tight text-stone-900 truncate mb-0.5">{char.name}</p>
-                          <p className={`text-[8px] font-black uppercase tracking-widest ${char.rarity === 'Legendary' ? 'text-rose-500' :
-                            char.rarity === 'Rare' ? 'text-amber-500' :
-                              'text-emerald-500'
-                            }`}>{char.rarity}</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             </div>
 

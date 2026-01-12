@@ -12,7 +12,8 @@ import {
     serverTimestamp,
     increment,
     writeBatch,
-    Timestamp
+    Timestamp,
+    arrayUnion
 } from 'firebase/firestore';
 import { CollectionTheme, Character, User } from '../types';
 
@@ -103,6 +104,17 @@ export const updateLastSpin = async (userId: string): Promise<void> => {
     });
 };
 
+/**
+ * Mark a collection as complete for a user
+ */
+export const markCollectionComplete = async (userId: string, themeId: string): Promise<void> => {
+    const userRef = doc(db, 'users', userId, 'profile', 'data');
+    await updateDoc(userRef, {
+        completedCollections: arrayUnion(themeId)
+    });
+};
+
+
 // ============================================================================
 // THEME FUNCTIONS
 // ============================================================================
@@ -153,7 +165,7 @@ export const saveTheme = async (
         await setDoc(publicThemeRef, {
             ...themeData,
             creatorId: userId,
-            creatorName: user?.name || 'Unknown'
+            creatorName: user?.studioName || user?.name || 'Unknown'
         });
     }
 
