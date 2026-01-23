@@ -46,6 +46,7 @@ import CharacterShelf from './components/CharacterShelf';
 import Onboarding from './components/Onboarding';
 import StudioFlow from './components/StudioFlow';
 import SpinWheel from './components/SpinWheel';
+import AdminPanel from './components/AdminPanel';
 import { auth, db } from './services/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -67,6 +68,7 @@ import {
   deleteTheme,
   markCollectionComplete
 } from './services/firestoreService';
+import { isAdmin } from './services/adminService';
 
 const PRESET_THEMES = [
   "Retro Arcade Bots",
@@ -125,6 +127,12 @@ const App: React.FC = () => {
 
   // Profile Dropdown State
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+
+  // Admin State
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+
+  // Track if collection was completed during current unboxing session
+  const [completionDuringUnboxing, setCompletionDuringUnboxing] = useState<{ themeId: string, themeName: string } | null>(null);
 
   // Stable reference for tracking server-side coin changes
   const lastCoinValue = useRef<number | null>(null);
@@ -189,6 +197,9 @@ const App: React.FC = () => {
 
           const fullUser = { ...newUser, ...profile };
           setUser(fullUser);
+
+          // Check admin status
+          setIsUserAdmin(isAdmin(newUser.email));
 
           setState(prev => ({
             ...prev,
@@ -717,13 +728,8 @@ const App: React.FC = () => {
         // Award 250 coins
         await updateUserCoins(user.id, 250);
 
-        // Trigger confetti
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 6000);
-
-        // Show notification
-        setNotification('🎉 Collection Complete! +250 Coins');
-        setTimeout(() => setNotification(null), 5000);
+        // Store completion info to trigger confetti AFTER unboxing is done
+        setCompletionDuringUnboxing({ themeId: themeToUse.id, themeName: themeToUse.name });
       }
     } catch (error) {
       console.error('Error checking collection completion:', error);
@@ -745,6 +751,18 @@ const App: React.FC = () => {
 
     setUnboxingChar(null);
     setUnboxingQueue([]);
+
+    // Trigger confetti if collection was completed during this unboxing session
+    if (completionDuringUnboxing) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 6000);
+
+      setNotification(`🎉 ${completionDuringUnboxing.themeName} Complete! +250 Coins`);
+      setTimeout(() => setNotification(null), 5000);
+
+      setCompletionDuringUnboxing(null);
+    }
+
     setView('collection');
   };
 
@@ -1030,6 +1048,18 @@ const App: React.FC = () => {
                     <p className="font-bold text-sm text-stone-900 truncate">{user.name}</p>
                     <p className="text-[10px] text-stone-400 truncate">{user.email}</p>
                   </div>
+                  {isUserAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowProfileDropdown(false);
+                        setView('admin');
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-stone-50 transition-colors flex items-center gap-3 text-stone-600 hover:text-purple-600"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span className="font-medium text-sm">Admin Panel</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setShowProfileDropdown(false);
@@ -1503,6 +1533,10 @@ const App: React.FC = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {view === 'admin' && (
+          <AdminPanel onClose={() => setView('marketplace')} />
         )}
       </main>
 

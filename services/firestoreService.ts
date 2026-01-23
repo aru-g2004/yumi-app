@@ -431,11 +431,19 @@ export const purchaseBlindBox = async (
     const charactersSnapshot = await getDocs(charactersRef);
     const characters = charactersSnapshot.docs.map(doc => doc.data());
 
+    // Check if this is the user's first purchase from this theme
+    const userCollectionRef = collection(db, 'users', buyerId, 'collection');
+    const userCollectionQuery = query(userCollectionRef, where('themeId', '==', themeId));
+    const userCollectionSnapshot = await getDocs(userCollectionQuery);
+    const isFirstPurchase = userCollectionSnapshot.empty;
+
     // Weighted random selection by rarity
     const rand = Math.random();
     let selectedRarity: 'Common' | 'Rare' | 'Legendary' = 'Common';
-    if (rand > 0.90) selectedRarity = 'Legendary';
-    else if (rand > 0.60) selectedRarity = 'Rare';
+
+    // Prevent Legendary on first purchase
+    if (!isFirstPurchase && rand > 0.95) selectedRarity = 'Legendary';
+    else if (rand > 0.70) selectedRarity = 'Rare';
 
     const rarityGroup = characters.filter(c => c.rarity === selectedRarity);
     const finalGroup = rarityGroup.length > 0 ? rarityGroup : characters;

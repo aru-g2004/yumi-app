@@ -52,7 +52,7 @@ export const generateThemeSet = async (themeIdea: string, advancedData?: Partial
   Provide:
   1. A catchy series name.
   2. A whimsical description for the entire series.
-  3. A global "visualStyle" summary that incorporates the finish and color scheme.
+  3. A global "visualStyle" summary that incorporates the finish and color scheme, make sure to include faces and facial expressions.
   4. Exactly 6 characters (3 Common, 2 Rare, 1 Legendary). 
   
   For each character, include a highly detailed visual description (2-3 sentences) ensuring they all fit the global visual style but have unique traits based on their rarity (Rare and Legendary must be visibly more special).
