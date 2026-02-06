@@ -13,6 +13,7 @@ const logUsage = (model: string, operation: string, response: any) => {
 };
 
 export const checkApiKey = async (): Promise<boolean> => {
+  console.log("DEBUG: Checking VITE_GEMINI_API_KEY...", import.meta.env.VITE_GEMINI_API_KEY ? "Present (Starts with " + import.meta.env.VITE_GEMINI_API_KEY.substring(0, 4) + ")" : "Missing");
   if (import.meta.env.VITE_GEMINI_API_KEY) return true;
   if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
     return await (window as any).aistudio.hasSelectedApiKey();
