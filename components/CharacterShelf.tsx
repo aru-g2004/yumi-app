@@ -22,7 +22,7 @@ const CharacterShelf: React.FC<CharacterShelfProps> = ({ theme, ownedCharacters,
         <div className="relative pt-2">
             {/* Centered Theme Title */}
             <div className="text-center">
-                <span className="text-[20px] uppercase tracking-[0.1em] text-emerald-500">
+                <span className="text-[20px] uppercase tracking-[0.1em] text-yellow-300 drop-shadow-md">
                     {theme.name} Edition
                 </span>
             </div>
@@ -37,7 +37,7 @@ const CharacterShelf: React.FC<CharacterShelfProps> = ({ theme, ownedCharacters,
                                 className="cursor-pointer transition-all duration-500 hover:scale-110 active:scale-95 group relative flex flex-col items-center transform -translate-y-4"
                             >
                                 {/* Character Image Container with Rectangular Rounding */}
-                                <div className="relative z-10 w-28 h-28 md:w-32 md:h-32 bg-white/40 backdrop-blur-sm rounded-[1.5rem] p-0 border-[1px] border-white/30 shadow-xl overflow-hidden">
+                                <div className="relative z-10 w-28 h-28 md:w-32 md:h-32 bg-white rounded-[1.5rem] p-0 border-[1px] border-stone-100 shadow-xl overflow-hidden">
                                     <img
                                         src={slot.owned.imageUrl}
                                         alt={slot.owned.name}
@@ -59,8 +59,8 @@ const CharacterShelf: React.FC<CharacterShelfProps> = ({ theme, ownedCharacters,
                             </div>
                         ) : (
                             /* Empty Slot Placeholder */
-                            <div className="w-24 h-24 bg-black/5 rounded-[1.0rem] border-[1px] border-dashed border-black/10 flex items-center justify-center opacity-40 transform -translate-y-4">
-                                <HelpCircle className="w-8 h-8 text-black/20" />
+                            <div className="w-24 h-24 bg-stone-50 rounded-[1.0rem] border-[1px] border-dashed border-stone-200 flex items-center justify-center opacity-40 transform -translate-y-4 shadow-inner">
+                                <HelpCircle className="w-8 h-8 text-stone-300" />
                             </div>
                         )}
                     </div>

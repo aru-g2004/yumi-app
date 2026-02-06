@@ -7,14 +7,14 @@ interface SpinWheelProps {
 }
 
 const SEGMENTS = [
-    { value: 50, color: 'bg-stone-200' },
-    { value: 200, color: 'bg-emerald-200' },
-    { value: 100, color: 'bg-stone-300' },
-    { value: 500, color: 'bg-rose-300' },
-    { value: 100, color: 'bg-stone-200' },
-    { value: 200, color: 'bg-amber-300' },
-    { value: 50, color: 'bg-stone-300' },
-    { value: 300, color: 'bg-emerald-300' },
+    { value: 50, color: 'bg-purple-400' },
+    { value: 200, color: 'bg-emerald-400' },
+    { value: 100, color: 'bg-blue-400' },
+    { value: 500, color: 'bg-rose-400' },
+    { value: 100, color: 'bg-amber-400' },
+    { value: 200, color: 'bg-cyan-400' },
+    { value: 50, color: 'bg-fuchsia-400' },
+    { value: 300, color: 'bg-indigo-400' },
 ];
 
 const SpinWheel: React.FC<SpinWheelProps> = ({ onWin, onClose }) => {
@@ -63,33 +63,33 @@ const SpinWheel: React.FC<SpinWheelProps> = ({ onWin, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white rounded-[3rem] p-8 shadow-2xl max-w-md w-full relative border border-white/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white rounded-[3rem] p-8 shadow-2xl max-w-md w-full relative border border-stone-100">
                 <button
                     onClick={onClose}
                     disabled={isSpinning}
-                    className="absolute top-6 right-6 p-2 bg-stone-100 rounded-full hover:bg-stone-200 transition-colors disabled:opacity-50"
+                    className="absolute top-6 right-6 p-2 bg-stone-100 rounded-full hover:bg-stone-200 transition-colors disabled:opacity-50 text-stone-500"
                 >
-                    <X className="w-5 h-5 text-stone-500" />
+                    <X className="w-5 h-5" />
                 </button>
 
                 <div className="text-center mb-8">
-                    <div className="inline-block bg-amber-100 p-4 rounded-full mb-4">
+                    <div className="inline-block bg-amber-100 p-4 rounded-full mb-4 border border-amber-200">
                         <Trophy className="w-8 h-8 text-amber-500" />
                     </div>
-                    <h2 className="text-3xl font-black tracking-tighter">Daily Spin</h2>
-                    <p className="text-stone-400 font-medium">Test your luck for bonus credits!</p>
+                    <h2 className="text-3xl font-black tracking-tighter text-stone-900 drop-shadow-sm">Daily Spin</h2>
+                    <p className="text-stone-500 font-medium">Test your luck for bonus credits!</p>
                 </div>
 
                 <div className="relative w-64 h-64 mx-auto mb-8">
                     {/* Pointer */}
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                        <div className="w-8 h-8 bg-stone-900 rotate-45 transform origin-center border-4 border-white shadow-lg rounded-sm"></div>
+                        <div className="w-8 h-8 bg-white rotate-45 transform origin-center border-4 border-stone-900 shadow-lg rounded-sm"></div>
                     </div>
 
                     {/* Wheel */}
                     <div
-                        className="w-full h-full rounded-full overflow-hidden border-8 border-bg-stone-50 shadow-inner relative transition-transform cubic-bezier(0.1, 0.7, 1.0, 0.1)"
+                        className="w-full h-full rounded-full overflow-hidden border-8 border-stone-100 shadow-xl relative transition-transform cubic-bezier(0.1, 0.7, 1.0, 0.1)"
                         style={{
                             transform: `rotate(${rotation}deg)`,
                             transition: isSpinning ? 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)' : 'none'
@@ -103,7 +103,7 @@ const SpinWheel: React.FC<SpinWheelProps> = ({ onWin, onClose }) => {
                             return (
                                 <div
                                     key={i}
-                                    className={`absolute top-0 right-0 w-1/2 h-1/2 origin-bottom-left flex items-start justify-end pr-8 pt-4 font-black text-stone-700/60 ${seg.color}`}
+                                    className={`absolute top-0 right-0 w-1/2 h-1/2 origin-bottom-left flex items-start justify-end pr-8 pt-4 font-black text-stone-900 ${seg.color}`}
                                     style={{
                                         transform: `rotate(${i * angle - (angle / 2)}deg) skewY(-${90 - angle}deg)`,
                                         // We need to un-skew content? This approach is tricky for text.
@@ -121,10 +121,10 @@ const SpinWheel: React.FC<SpinWheelProps> = ({ onWin, onClose }) => {
                             return (
                                 <div
                                     key={`text-${i}`}
-                                    className="absolute inset-0 flex justify-center pt-4"
+                                    className="absolute inset-0 flex justify-center pt-4 pointer-events-none"
                                     style={{ transform: `rotate(${rotation}deg)` }}
                                 >
-                                    <span className="font-black text-stone-600/80 text-sm">{seg.value}</span>
+                                    <span className="font-black text-white text-sm drop-shadow-md">{seg.value}</span>
                                 </div>
                             )
                         })}
@@ -137,8 +137,8 @@ const SpinWheel: React.FC<SpinWheelProps> = ({ onWin, onClose }) => {
                 <div className="text-center">
                     {wonAmount ? (
                         <div className="animate-in zoom-in duration-300">
-                            <p className="text-2xl font-black text-emerald-500 mb-4">You won {wonAmount}!</p>
-                            <button onClick={onClose} className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all">
+                            <p className="text-2xl font-black text-emerald-300 mb-4 drop-shadow-md">You won {wonAmount}!</p>
+                            <button onClick={onClose} className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all border border-emerald-400">
                                 Collect
                             </button>
                         </div>

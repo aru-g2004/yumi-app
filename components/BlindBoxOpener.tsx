@@ -62,25 +62,30 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-stone-950 flex flex-col items-center justify-start pt-8 lg:pt-16 p-4 overflow-hidden select-none"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-8 lg:pt-16 p-4 overflow-hidden select-none"
       onMouseMove={handleMove}
       onMouseUp={handleEnd}
       onMouseLeave={handleEnd}
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
     >
+      {/* Animated Purple Gradient Background */}
+      <div className="absolute inset-0 -z-20 bg-gradient-to-br from-purple-900 via-pink-600 to-blue-500 opacity-90"></div>
+      <div className="absolute inset-0 -z-20 bg-gradient-to-tl from-cyan-400 via-purple-500 to-pink-500 opacity-70 animate-pulse" style={{ animationDuration: '8s' }}></div>
+      <div className="absolute inset-0 -z-20 backdrop-blur-3xl bg-black/10"></div>
+
       {/* Top Right Coins */}
       {currentCoins !== undefined && (
-        <div className="absolute top-8 right-8 z-[100] bg-white/10 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-3 shadow-xl">
-          <Coins className="w-5 h-5 text-emerald-400" />
+        <div className="absolute top-8 right-8 z-[100] bg-stone-900 border border-stone-800 px-6 py-3 rounded-full flex items-center gap-3 shadow-xl">
+          <Coins className="w-5 h-5 text-yellow-300" />
           <span className="font-black text-white text-lg tracking-tight">{currentCoins}</span>
         </div>
       )}
 
       {/* Immersive Background Stage */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.15)_0%,transparent_50%)] animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-stone-900 to-transparent opacity-50"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1)_0%,transparent_50%)] animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/20 to-transparent opacity-50"></div>
       </div>
 
       <div className="relative w-full max-w-6xl h-full flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-16 z-10">
@@ -99,13 +104,13 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
               onMouseDown={handleStart}
               onTouchStart={handleStart}
             >
-              <div className="absolute inset-0 bg-white rounded-[4rem] shadow-[0_80px_160px_-40px_rgba(0,0,0,0.9)] overflow-hidden border-[6px] border-white/30 transform-gpu">
+              <div className="absolute inset-0 bg-white/10 backdrop-blur-xl rounded-[4rem] shadow-[0_80px_160px_-40px_rgba(0,0,0,0.5)] overflow-hidden border-[6px] border-white/20 transform-gpu">
                 {theme?.boxImageUrl ? (
                   <img src={theme.boxImageUrl} alt="Packaging" className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
                 ) : (
-                  <div className="w-full h-full bg-stone-900 flex flex-col items-center justify-center gap-6">
-                    <Box className="w-24 h-24 text-stone-700 animate-bounce" />
-                    <p className="text-xs font-black uppercase tracking-[0.5em] text-stone-500">Premium Series</p>
+                  <div className="w-full h-full bg-white/5 flex flex-col items-center justify-center gap-6">
+                    <Box className="w-24 h-24 text-white/20 animate-bounce" />
+                    <p className="text-xs font-black uppercase tracking-[0.5em] text-white/40">Premium Series</p>
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20 pointer-events-none"></div>
@@ -120,13 +125,13 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
                       style={{ width: `${tearProgress * 100}%`, transform: 'translateY(-50%)' }}
                     ></div>
                     <div
-                      className="absolute top-1/2 -translate-y-1/2 bg-white p-5 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition-transform border-4 border-emerald-400/20"
+                      className="absolute top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-md p-5 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition-transform border-4 border-emerald-400/30"
                       style={{
                         left: `calc(${tearProgress * 100}% - 35px)`,
                         transform: `translateY(-50%) scale(${isDragging ? 1.2 : 1}) rotate(${tearProgress * 720}deg)`
                       }}
                     >
-                      <Scissors className="w-8 h-8 text-stone-900" />
+                      <Scissors className="w-8 h-8 text-white" />
                     </div>
                   </div>
                 </div>
@@ -143,22 +148,22 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
               {/* Character Card */}
               <div className="relative w-full aspect-square mb-6">
                 <div className="absolute inset-0 bg-emerald-500 rounded-full opacity-40 blur-[100px] animate-pulse scale-125"></div>
-                <div className="relative w-full h-full rounded-[3rem] overflow-hidden border-[8px] border-white shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] z-10 bg-white">
+                <div className="relative w-full h-full rounded-[3rem] overflow-hidden border-[8px] border-white/20 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] z-10 bg-stone-900">
                   <img src={character.imageUrl} alt={character.name} className="w-full h-full object-cover animate-in fade-in duration-1000" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                 </div>
-                <div className="absolute -top-6 -right-6 bg-white text-emerald-600 p-4 rounded-[2rem] shadow-xl animate-bounce border-2 border-stone-50 z-20">
-                  <Sparkles className="w-8 h-8 fill-emerald-50" />
+                <div className="absolute -top-6 -right-6 bg-white/20 backdrop-blur-xl text-emerald-300 p-4 rounded-[2rem] shadow-xl animate-bounce border-2 border-white/30 z-20">
+                  <Sparkles className="w-8 h-8 fill-emerald-100" />
                 </div>
               </div>
 
               {/* Text Content (Flows naturally below image, no absolute overlap) */}
               <div className="text-center w-[300px] space-y-4 z-20">
                 <div className="space-y-1">
-                  <span className="text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400">{character.rarity} find unlocked</span>
+                  <span className="text-[9px] font-black uppercase tracking-[0.3em] text-emerald-300 drop-shadow-md">{character.rarity} find unlocked</span>
                   <h2 className="text-3xl font-black text-white tracking-tighter drop-shadow-md leading-none italic">{character.name}</h2>
                 </div>
-                <div className="inline-flex items-center gap-3 bg-white/10 px-8 py-3 rounded-full border border-white/20 shadow-xl">
+                <div className="inline-flex items-center gap-3 bg-stone-900 px-8 py-3 rounded-full border border-stone-800 shadow-xl">
                   <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${character.rarity === 'Legendary' ? 'bg-rose-400' : character.rarity === 'Rare' ? 'bg-amber-400' : 'bg-emerald-400'}`}></div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-white">{character.rarity} EDITION</span>
                 </div>
@@ -168,10 +173,10 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
         </div>
 
         {/* Right: Collection Progress (Compact) */}
-        <div className="w-full lg:w-[320px] shrink-0 bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-6 md:p-8 border border-white/10 shadow-2xl flex flex-col gap-6">
+        <div className="w-full lg:w-[320px] shrink-0 bg-stone-900 rounded-[2.5rem] p-6 md:p-8 border border-stone-800 shadow-2xl flex flex-col gap-6">
           <div className="space-y-1">
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500 block">Series Collection</span>
-            <h3 className="text-2xl font-black text-white tracking-tighter">{theme?.name || 'Unknown Series'}</h3>
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 block">Series Collection</span>
+            <h3 className="text-2xl font-black text-white tracking-tighter drop-shadow-md">{theme?.name || 'Unknown Series'}</h3>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -186,10 +191,10 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
 
               return (
                 <div key={i} className="space-y-1.5 group">
-                  <div className={`aspect-square rounded-[1.5rem] border transition-all duration-500 overflow-hidden relative flex items-center justify-center p-2 ${isCollected ? 'bg-white border-white/20 shadow-xl' : 'bg-white/5 border-white/5 opacity-50'
+                  <div className={`aspect-square rounded-[1.5rem] border transition-all duration-500 overflow-hidden relative flex items-center justify-center p-2 ${isCollected ? 'bg-white/20 backdrop-blur-md border-white/30 shadow-xl' : 'bg-white/5 border-white/5 opacity-50'
                     }`}>
                     {isMystery ? (
-                      <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-[1.5rem] flex items-center justify-center relative overflow-hidden">
+                      <div className="w-full h-full bg-gradient-to-br from-indigo-500/50 via-purple-500/50 to-pink-500/50 rounded-[1.5rem] flex items-center justify-center relative overflow-hidden backdrop-blur-sm">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubeico.png')] opacity-20"></div>
                         <HelpCircle className="w-8 h-8 text-white animate-pulse" />
                       </div>
@@ -200,12 +205,12 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
                     )}
                   </div>
                   <div className="text-center px-1">
-                    <p className={`text-[10px] font-black tracking-tight truncate mb-0.5 ${isCollected ? 'text-white' : isMystery ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600' : 'text-stone-600'}`}>
+                    <p className={`text-[10px] font-black tracking-tight truncate mb-0.5 ${isCollected ? 'text-white' : isMystery ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-300' : 'text-white/40'}`}>
                       {isMystery ? '???' : char.name}
                     </p>
-                    <p className={`text-[7px] font-black uppercase tracking-widest ${char.rarity === 'Legendary' ? 'text-rose-500' :
-                      char.rarity === 'Rare' ? 'text-amber-500' :
-                        'text-emerald-500'
+                    <p className={`text-[7px] font-black uppercase tracking-widest ${char.rarity === 'Legendary' ? 'text-rose-400' :
+                      char.rarity === 'Rare' ? 'text-amber-400' :
+                        'text-emerald-400'
                       }`}>{char.rarity}</p>
                   </div>
                 </div>
@@ -214,8 +219,8 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
           </div>
 
           <div className="mt-auto pt-6 border-t border-white/10">
-            <div className="flex justify-between items-center bg-white/5 px-6 py-4 rounded-2xl">
-              <span className="text-[10px] font-black uppercase tracking-widest text-stone-400">Progess</span>
+            <div className="flex justify-between items-center bg-white/5 px-6 py-4 rounded-2xl border border-white/5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Progess</span>
               <span className="text-xl font-black text-white">
                 {themeCharacters.filter(tc =>
                   userCollection.some(uc => uc.name === tc.name && uc.themeId === theme?.id) ||
@@ -251,9 +256,9 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
           ) : onBuyMore ? (
             <button
               onClick={onBuyMore}
-              className="bg-stone-100 hover:bg-white text-stone-900 px-8 py-4 rounded-full font-black uppercase tracking-widest text-xs transition-all shadow-lg transform hover:scale-105 active:scale-95 flex items-center gap-2"
+              className="bg-white/20 backdrop-blur-md hover:bg-white/30 text-white border border-white/30 px-8 py-4 rounded-full font-black uppercase tracking-widest text-xs transition-all shadow-lg transform hover:scale-105 active:scale-95 flex items-center gap-2"
             >
-              Buy Another <Sparkles className="w-4 h-4 text-emerald-500" />
+              Buy Another <Sparkles className="w-4 h-4 text-emerald-400" />
             </button>
           ) : null}
         </div>
