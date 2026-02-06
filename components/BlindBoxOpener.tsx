@@ -22,6 +22,24 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
   const [isDragging, setIsDragging] = useState(false);
   const [tearProgress, setTearProgress] = useState(0);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const ripSoundRef = useRef<HTMLAudioElement | null>(null);
+  const hasPlayedRipSound = useRef(false);
+
+  // Initialize ripping sound
+  useEffect(() => {
+    // Local paper tear sound
+    ripSoundRef.current = new Audio('/src/components/greatnessdon-tearing-paper-193827.mp3');
+    ripSoundRef.current.volume = 0.7;
+    ripSoundRef.current.play();
+    ripSoundRef.current.load();
+    console.log('[BlindBoxOpener] Rip sound initialized');
+    return () => {
+      if (ripSoundRef.current) {
+        ripSoundRef.current.pause();
+        ripSoundRef.current = null;
+      }
+    };
+  }, []);
 
   const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (step !== 'box-sealed') return;
@@ -29,6 +47,7 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     dragStartRef.current = { x: clientX, y: clientY };
     setIsDragging(true);
+    hasPlayedRipSound.current = false;
   };
 
   const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
@@ -40,6 +59,23 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
       const dx = clientX - dragStartRef.current.x;
       const progress = Math.min(Math.max(Math.abs(dx) / 250, 0), 1);
       setTearProgress(progress);
+
+      // Play ripping sound when tear starts (first 2 seconds only)
+      if (progress > 0.1 && !hasPlayedRipSound.current && ripSoundRef.current) {
+        console.log('[BlindBoxOpener] Playing rip sound');
+        ripSoundRef.current.currentTime = 0;
+        ripSoundRef.current.play()
+          .then(() => {
+            // Stop after 2 seconds
+            setTimeout(() => {
+              if (ripSoundRef.current) {
+                ripSoundRef.current.pause();
+              }
+            }, 2000);
+          })
+          .catch(err => console.warn('[BlindBoxOpener] Sound play failed:', err));
+        hasPlayedRipSound.current = true;
+      }
 
       if (progress >= 0.95) {
         setIsDragging(false);

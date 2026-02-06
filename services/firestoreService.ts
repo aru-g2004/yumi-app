@@ -431,21 +431,62 @@ export const purchaseBlindBox = async (
     const charactersSnapshot = await getDocs(charactersRef);
     const characters = charactersSnapshot.docs.map(doc => doc.data());
 
-    // Check if this is the user's first purchase from this theme
+    // 1. Count how many items of this theme the user has already opened
     const userCollectionRef = collection(db, 'users', buyerId, 'collection');
     const userCollectionQuery = query(userCollectionRef, where('themeId', '==', themeId));
     const userCollectionSnapshot = await getDocs(userCollectionQuery);
-    const isFirstPurchase = userCollectionSnapshot.empty;
 
-    // Weighted random selection by rarity
-    const rand = Math.random();
+    // Sum up counts of all characters owned from this theme
+    let totalOpened = 0;
+    userCollectionSnapshot.docs.forEach(doc => {
+        totalOpened += (doc.data().count || 1);
+    });
+
+    // 2. Determine Unlock Status (Legendary unlocks on 10th box, i.e., after 9 opened)
+    const isLegendaryUnlocked = totalOpened >= 9;
+
+    console.log(`[BlindBox] User has opened ${totalOpened} boxes for theme ${themeId}. Legendary Unlocked: ${isLegendaryUnlocked}`);
+
+    // 3. Roll for Rarity
+    const rng = Math.random();
     let selectedRarity: 'Common' | 'Rare' | 'Legendary' = 'Common';
 
-    // Prevent Legendary on first purchase
-    if (!isFirstPurchase && rand > 0.95) selectedRarity = 'Legendary';
-    else if (rand > 0.70) selectedRarity = 'Rare';
+    // Rarity Thresholds
+    // Legendary: 1/15 (~0.0666) IF unlocked
+    // Rare: 1/10 (0.10)
 
-    const rarityGroup = characters.filter(c => c.rarity === selectedRarity);
+    const thresholdLegendary = isLegendaryUnlocked ? (1 / 15) : 0;
+    const thresholdRare = thresholdLegendary + (1 / 10);
+
+    if (rng < thresholdLegendary) {
+        selectedRarity = 'Legendary';
+    } else if (rng < thresholdRare) {
+        selectedRarity = 'Rare';
+    } else {
+        selectedRarity = 'Common';
+    }
+
+    console.log(`[BlindBox] RNG: ${rng.toFixed(4)}. Thresholds - Leg: ${thresholdLegendary.toFixed(4)}, Rare: ${thresholdRare.toFixed(4)}. Selected: ${selectedRarity}`);
+
+    // 4. Select Character from Rarity Group
+    let rarityGroup = characters.filter(c => c.rarity === selectedRarity);
+
+    // Fallback: If no characters in selected rarity, downgrade
+    if (rarityGroup.length === 0) {
+        if (selectedRarity === 'Legendary') {
+            console.log(`[BlindBox] No Legendary items found. Fallback to Rare.`);
+            selectedRarity = 'Rare';
+            rarityGroup = characters.filter(c => c.rarity === 'Rare');
+        }
+
+        if (rarityGroup.length === 0) {
+            console.log(`[BlindBox] No Rare items found. Fallback to Common.`);
+            selectedRarity = 'Common';
+            rarityGroup = characters.filter(c => c.rarity === 'Common');
+        }
+    }
+
+    // Final safety: if somehow no Commons, pick ANY character
     const finalGroup = rarityGroup.length > 0 ? rarityGroup : characters;
     const randomChar = finalGroup[Math.floor(Math.random() * finalGroup.length)];
 

@@ -221,3 +221,66 @@ export const generateCharacterImage = async (
     throw new Error(`No image found. finishReason: ${finishReason || 'UNKNOWN'}`);
   });
 };
+
+/**
+ * Generate a 360-degree turntable video for a character using Veo 2
+ */
+export const generateCharacterVideo = async (
+  userId: string,
+  themeId: string,
+  character: Partial<Character>,
+  themeName: string,
+  visualStyle: string
+): Promise<string> => {
+  return withRetry(async () => {
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const modelName = 'veo-2.0-generate-001';
+
+    const prompt = `A seamless 360-degree rotating turntable shot of an adorable 3D vinyl collectible toy figurine: "${character.name}". ${character.description}. Visual style: ${visualStyle}. Part of the "${themeName}" series.
+    
+The figurine is slowly spinning on a clean, smooth rotating display stand. Solid pastel background. Studio lighting. The camera is stationary while the turntable rotates the figurine smoothly through a full 360-degree rotation. No cuts, seamless loop. Professional product video, 4 seconds.`;
+
+    console.log(`[Gemini Veo] Generating 360 video for: ${character.name}`);
+
+    // Veo 2 uses generateVideos endpoint
+    const response = await (ai.models as any).generateVideos({
+      model: modelName,
+      prompt: prompt,
+      config: {
+        aspectRatio: "9:16",
+        numberOfVideos: 1,
+        durationSeconds: 4,
+        personGeneration: "dont_allow"
+      }
+    });
+
+    logUsage(modelName, "Character Video Generation", response);
+
+    // Veo returns operation that needs polling
+    let operation = response;
+    while (!operation.done) {
+      console.log("[Gemini Veo] Waiting for video generation...");
+      await new Promise(r => setTimeout(r, 5000));
+      operation = await (ai.operations as any).get({ operation: operation.name });
+    }
+
+    const generatedVideos = operation.response?.generatedVideos;
+    if (!generatedVideos || generatedVideos.length === 0) {
+      throw new Error("No video generated");
+    }
+
+    const videoData = generatedVideos[0].video?.data;
+    if (!videoData) {
+      throw new Error("Video data missing from response");
+    }
+
+    // Upload to Firebase Storage
+    const { uploadVideoToStorage } = await import('./firebase');
+    const safeCharName = (character.name || 'char').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const videoFilename = `characters/${safeCharName}_360.mp4`;
+    const videoUrl = await uploadVideoToStorage(`data:video/mp4;base64,${videoData}`, userId, themeId, videoFilename);
+
+    console.log(`[Gemini Veo] Video uploaded: ${videoUrl}`);
+    return videoUrl;
+  }, 2, 10000); // Fewer retries, longer delay for video gen
+};

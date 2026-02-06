@@ -18,9 +18,10 @@ export interface Character {
   videoUrl?: string;
   theme: string;
   themeId: string;
-  themeCreatorId?: string;
+  themeCreatorId: string;
   obtainedAt: number;
-  count?: number;
+  count: number;
+  isListedForTrade?: boolean;
 }
 
 export interface CollectionTheme {
