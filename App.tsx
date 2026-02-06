@@ -308,7 +308,10 @@ const App: React.FC = () => {
     const apiMessage = error?.message || errorStr;
     console.error("Caught Error:", error);
 
-    if (errorStr.toLowerCase().includes('403') || errorStr.toLowerCase().includes('401') || errorStr.toLowerCase().includes('permission')) {
+    // Specific check for Firestore permission errors to avoid confusing them with API Key issues
+    if (errorStr.includes('Missing or insufficient permissions') || (error as any)?.code === 'permission-denied') {
+      setGlobalError(`Database Permission Error: Access denied. Please try again now that rules are updated.`);
+    } else if (errorStr.toLowerCase().includes('403') || errorStr.toLowerCase().includes('401') || errorStr.toLowerCase().includes('permission')) {
       setGlobalError(`API Access Issue: ${apiMessage}. (If this is 403, billing is likely required for public domains)`);
       setApiKeySelected(false);
     } else if (errorStr.toLowerCase().includes('429')) {
