@@ -19,7 +19,7 @@ const Login: React.FC = () => {
             </div>
             <div className="text-center space-y-2">
                 <h1 className="text-4xl font-black tracking-tighter">yumi.</h1>
-                <p className="text-stone-400 font-bold uppercase tracking-widest text-xs">AI Toy Studio</p>
+                <p className="text-stone-400 font-bold uppercase tracking-widest text-xs">Your universe of collectibles</p>
             </div>
             <button
                 onClick={handleGoogleLogin}

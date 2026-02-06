@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Sparkles, Wand2, Volume2, Coins, AlertCircle, Loader2, Sparkle } from 'lucide-react';
-import { connectToDesignLab, decodeAudioData, decodeBase64, createPcmBlob } from '../services/geminiService';
 import SpinWheel from './SpinWheel';
+import { connectToDesignLab, decodeAudioData, decodeBase64, createPcmBlob } from '../services/geminiService';
 
 export interface LiveDesignLabProps {
   onEarn: (amount: number, themeName?: string) => void;
