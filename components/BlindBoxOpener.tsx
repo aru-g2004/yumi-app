@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Sparkles, Scissors, Gift, PackageOpen, Box, ArrowRight, Coins, HelpCircle } from 'lucide-react';
+import { Sparkles, Scissors, Gift, PackageOpen, Box, ArrowRight, Coins, HelpCircle, Play, Loader2, Share2 } from 'lucide-react';
 import { Character, CollectionTheme } from '../types';
 
 interface BlindBoxOpenerProps {
@@ -25,13 +25,13 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
   const ripSoundRef = useRef<HTMLAudioElement | null>(null);
   const hasPlayedRipSound = useRef(false);
 
+
   // Initialize ripping sound
   useEffect(() => {
     // Local paper tear sound
-    ripSoundRef.current = new Audio('/src/components/greatnessdon-tearing-paper-193827.mp3');
+    ripSoundRef.current = new Audio('/components/greatnessdon-tearing-paper-193827.mp3');
     ripSoundRef.current.volume = 0.7;
-    ripSoundRef.current.play();
-    ripSoundRef.current.load();
+    ripSoundRef.current.load(); // Preload only, don't play yet
     console.log('[BlindBoxOpener] Rip sound initialized');
     return () => {
       if (ripSoundRef.current) {
@@ -57,13 +57,14 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
 
     if (dragStartRef.current) {
       const dx = clientX - dragStartRef.current.x;
-      const progress = Math.min(Math.max(Math.abs(dx) / 250, 0), 1);
+      // Increased sensitivity (divisor reduced from 250 to 180)
+      const progress = Math.min(Math.max(Math.abs(dx) / 180, 0), 1);
       setTearProgress(progress);
 
       // Play ripping sound when tear starts (first 2 seconds only)
       if (progress > 0.1 && !hasPlayedRipSound.current && ripSoundRef.current) {
         console.log('[BlindBoxOpener] Playing rip sound');
-        ripSoundRef.current.currentTime = 0;
+        ripSoundRef.current.currentTime = 1; // Start 0.5 seconds in
         ripSoundRef.current.play()
           .then(() => {
             // Stop after 2 seconds
@@ -71,28 +72,40 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
               if (ripSoundRef.current) {
                 ripSoundRef.current.pause();
               }
-            }, 2000);
+            }, 1000);
           })
           .catch(err => console.warn('[BlindBoxOpener] Sound play failed:', err));
         hasPlayedRipSound.current = true;
       }
 
-      if (progress >= 0.95) {
-        setIsDragging(false);
-        setStep('box-tearing');
-        setTimeout(() => {
-          setStep('finished');
-        }, 1200);
+      if (progress >= 0.7) {
+        setTearProgress(1);
+        handleTriggerRip();
       }
     }
   };
 
-  const handleEnd = () => {
+  const handleTriggerRip = () => {
+    if (step !== 'box-sealed') return;
     setIsDragging(false);
-    if (tearProgress < 0.95) {
+    setStep('box-tearing');
+    // Reduced from 1200ms to 800ms for a punchier feel
+    setTimeout(() => {
+      setStep('finished');
+    }, 800);
+  };
+
+  const handleEnd = () => {
+    if (step !== 'box-sealed') return;
+    setIsDragging(false);
+    if (tearProgress >= 0.4) {
+      setTearProgress(1);
+      handleTriggerRip();
+    } else {
       setTearProgress(0);
     }
   };
+
 
   // Bag handlers removed
 
@@ -131,8 +144,8 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
           {/* Step 1 & 2: The Generated Box Art (Bigger & 3D) */}
           {(step === 'box-sealed' || step === 'box-tearing') && (
             <div
-              className={`relative w-[280px] md:w-[340px] aspect-[4/5] transition-all duration-1000 cursor-grab active:cursor-grabbing ${step === 'box-tearing' ? 'scale-[2] opacity-0 blur-2xl' : 'scale-100'
-                }`}
+              className={`relative w-[280px] md:w-[340px] aspect-[4/5] transition-all duration-1000 cursor-grab active:cursor-grabbing ${step === 'box-tearing' ? 'scale-[2.5] opacity-0 blur-3xl' : 'scale-100'
+                } ${tearProgress > 0.7 ? 'animate-[bounce_0.2s_infinite]' : ''}`}
               style={{
                 transform: `rotateY(${(tearProgress - 0.5) * 20}deg) rotateX(${isDragging ? 10 : 0}deg)`,
                 transformStyle: 'preserve-3d'
@@ -164,7 +177,8 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
                       className="absolute top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-md p-5 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition-transform border-4 border-emerald-400/30"
                       style={{
                         left: `calc(${tearProgress * 100}% - 35px)`,
-                        transform: `translateY(-50%) scale(${isDragging ? 1.2 : 1}) rotate(${tearProgress * 720}deg)`
+                        transform: `translateY(-50%) scale(${isDragging ? 1.3 : 1}) rotate(${tearProgress * 720}deg)`,
+                        boxShadow: `0 0 ${tearProgress * 40}px rgba(52, 211, 153, ${tearProgress})`
                       }}
                     >
                       <Scissors className="w-8 h-8 text-white" />
@@ -203,6 +217,7 @@ const BlindBoxOpener: React.FC<BlindBoxOpenerProps> = ({ character, theme, theme
                   <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${character.rarity === 'Legendary' ? 'bg-rose-400' : character.rarity === 'Rare' ? 'bg-amber-400' : 'bg-emerald-400'}`}></div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-white">{character.rarity} EDITION</span>
                 </div>
+
               </div>
             </div>
           )}

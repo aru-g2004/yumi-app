@@ -204,6 +204,7 @@ export const deleteTheme = async (userId: string, themeId: string): Promise<void
     await batch.commit();
 };
 
+
 /**
  * Save character to theme
  */
@@ -223,7 +224,6 @@ export const saveCharacter = async (
         description: character.description,
         rarity: character.rarity,
         imageUrl: character.imageUrl,
-        videoUrl: character.videoUrl || null,
         createdAt: serverTimestamp()
     });
 };
@@ -241,7 +241,6 @@ export const getThemeCharacters = async (userId: string, themeId: string): Promi
         description: charDoc.data().description,
         rarity: charDoc.data().rarity as 'Common' | 'Rare' | 'Legendary',
         imageUrl: charDoc.data().imageUrl,
-        videoUrl: charDoc.data().videoUrl
     }));
 };
 
@@ -267,7 +266,6 @@ export const getUserThemes = async (userId: string): Promise<CollectionTheme[]> 
             description: charDoc.data().description,
             rarity: charDoc.data().rarity as 'Common' | 'Rare' | 'Legendary',
             imageUrl: charDoc.data().imageUrl,
-            videoUrl: charDoc.data().videoUrl
         }));
 
         themes.push({
@@ -320,7 +318,7 @@ export const addToCollection = async (
         const existingDoc = existingDocs.docs[0];
         await updateDoc(existingDoc.ref, {
             count: increment(1),
-            obtainedAt: serverTimestamp()
+            obtainedAt: serverTimestamp(),
         });
     } else {
         // Add new character to collection

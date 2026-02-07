@@ -77,17 +77,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         <div className="space-y-8">
                             <div className="bg-white rounded-[3rem] p-10 space-y-8 shadow-2xl">
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 block">Studio Name</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-stone-500 block">Studio Name</label>
                                     <input
                                         type="text"
                                         value={studioName}
                                         onChange={(e) => setStudioName(e.target.value)}
                                         placeholder="e.g. Dreamweaver Studio"
-                                        className="w-full bg-stone-50 border-2 border-stone-100 rounded-3xl px-8 py-5 text-xl font-bold focus:border-purple-500 outline-none transition-all shadow-inner text-stone-900 placeholder:text-stone-300"
+                                        className="w-full bg-stone-50 border-2 border-stone-100 rounded-3xl px-8 py-5 text-xl font-bold focus:border-purple-500 outline-none transition-all shadow-inner text-stone-900 placeholder:text-stone-600"
                                     />
                                 </div>
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 block">Select Avatar</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-stone-500 block">Select Avatar</label>
                                     <div className="flex justify-center gap-4">
                                         {PRESET_AVATARS.map((url, i) => (
                                             <button
@@ -98,7 +98,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                                                 <img src={url} alt="preset" className="w-full h-full object-cover" />
                                             </button>
                                         ))}
-                                        <button className="w-16 h-16 rounded-2xl border-4 border-dashed border-stone-200 flex items-center justify-center text-stone-300 hover:text-stone-400 hover:border-stone-300 transition-all">
+                                        <button className="w-16 h-16 rounded-2xl border-4 border-dashed border-stone-200 flex items-center justify-center text-stone-500 hover:text-stone-500 hover:border-stone-300 transition-all">
                                             <Camera className="w-6 h-6" />
                                         </button>
                                     </div>

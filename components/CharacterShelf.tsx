@@ -22,7 +22,7 @@ const CharacterShelf: React.FC<CharacterShelfProps> = ({ theme, ownedCharacters,
         <div className="relative pt-2">
             {/* Centered Theme Title */}
             <div className="text-center">
-                <span className="text-[20px] uppercase tracking-[0.1em] text-yellow-300 drop-shadow-md">
+                <span className="text-[20px] uppercase tracking-[0.1em] text-teal-600 drop-shadow-md">
                     {theme.name} Edition
                 </span>
             </div>
@@ -67,27 +67,27 @@ const CharacterShelf: React.FC<CharacterShelfProps> = ({ theme, ownedCharacters,
                 ))}
             </div>
 
-            {/* Glass Shelf Surface - LIGHT BLUE TRANSPARENT */}
+            {/* Glass Shelf Surface - DARKER TONE */}
             <div className="relative h-5 mt-[-12px]">
                 {/* The Glass Plate */}
-                <div className="absolute inset-x-0 h-full bg-blue-100/30 backdrop-blur-xl border-[1.0px] border-white/60 rounded-sm shadow-[0_12px_40px_-10px_rgba(59,130,246,0.1)]">
+                <div className="absolute inset-x-0 h-full bg-slate-900/60 backdrop-blur-xl border-[1.0px] border-white/20 rounded-sm shadow-[0_12px_40px_-10px_rgba(0,0,0,0.3)]">
                     {/* Top edge highlight */}
-                    <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-white/80"></div>
+                    <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-white/20"></div>
                     {/* Bottom edge shadow */}
-                    <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-blue-900/10"></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-black/40"></div>
                     {/* The "Blueish" tint on the edge */}
-                    <div className="absolute top-0 right-0 bottom-0 w-[6px] bg-blue-400/20"></div>
-                    <div className="absolute top-0 left-0 bottom-0 w-[6px] bg-blue-300/10"></div>
+                    <div className="absolute top-0 right-0 bottom-0 w-[6px] bg-slate-800/40"></div>
+                    <div className="absolute top-0 left-0 bottom-0 w-[6px] bg-slate-900/30"></div>
 
                     {/* Internal glass texture/sheen */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 translate-x-[-50%] group-hover:translate-x-[150%] transition-transform duration-1000"></div>
                 </div>
             </div>
 
-            {/* Brackets - High quality metal look */}
+            {/* Brackets - Darker metallic look */}
             <div className="flex justify-between px-24 relative z-0">
-                <div className="w-4 h-10 bg-gradient-to-b from-stone-400 via-stone-200 to-stone-400 rounded-b-xl shadow-lg border-x border-white/20 transform -translate-y-2"></div>
-                <div className="w-4 h-10 bg-gradient-to-b from-stone-400 via-stone-200 to-stone-400 rounded-b-xl shadow-lg border-x border-white/20 transform -translate-y-2"></div>
+                <div className="w-4 h-10 bg-gradient-to-b from-stone-700 via-stone-500 to-stone-700 rounded-b-xl shadow-lg border-x border-white/10 transform -translate-y-2"></div>
+                <div className="w-4 h-10 bg-gradient-to-b from-stone-700 via-stone-500 to-stone-700 rounded-b-xl shadow-lg border-x border-white/10 transform -translate-y-2"></div>
             </div>
         </div>
     );

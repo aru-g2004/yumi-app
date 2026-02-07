@@ -36,7 +36,6 @@ import { AppState, AppView, Character, CollectionTheme, User } from './types';
 import {
   generateThemeSet,
   generateCharacterImage,
-  generateCharacterVideo,
   generateBoxArt,
   requestApiKey,
   checkApiKey
@@ -640,24 +639,14 @@ const App: React.FC = () => {
         const def = await purchaseBlindBox(user.id, purchaseModalTheme.id, creatorId, 100);
 
         let finalImageUrl = def.imageUrl;
+        let finalBase64: string | undefined;
         if (!finalImageUrl) {
           // Generate if missing (rare case in production)
-          finalImageUrl = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, '1K');
+          const result = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, '1K');
+          finalImageUrl = result.url;
+          finalBase64 = result.base64;
         }
 
-        // Generate 360 video in background (don't block UI)
-        let videoUrl: string | undefined;
-        generateCharacterVideo(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle)
-          .then(url => {
-            console.log(`[App] 360 video generated for ${def.name}: ${url}`);
-            // Update the character in queue/state with videoUrl
-            setUnboxingQueue(prev => prev.map(c => c.name === def.name ? { ...c, videoUrl: url } : c));
-            setState(prev => ({
-              ...prev,
-              collection: prev.collection.map(c => c.name === def.name && c.themeId === themeToUse.id ? { ...c, videoUrl: url } : c)
-            }));
-          })
-          .catch(err => console.warn(`[App] Video gen failed for ${def.name}:`, err));
 
         newQueue.push({
           id: Math.random().toString(36).substr(2, 9),
@@ -665,7 +654,6 @@ const App: React.FC = () => {
           description: def.description || '',
           rarity: def.rarity,
           imageUrl: finalImageUrl,
-          videoUrl,
           theme: themeToUse.name,
           themeId: themeToUse.id,
           themeCreatorId: creatorId,
@@ -829,7 +817,7 @@ const App: React.FC = () => {
           <div className="w-12 h-12 border-4 border-stone-100 border-t-stone-900 rounded-full animate-spin"></div>
         </div>
       </div>
-      <p className="mt-12 text-lg font-black tracking-tight text-stone-900 animate-pulse text-center max-w-xs px-4">
+      <p className="mt-12 text-lg font-black tracking-tight text-[#2a0029] animate-pulse text-center max-w-xs px-4">
         {loadingMsg || 'Creating magic...'}
       </p>
     </div>
@@ -856,7 +844,7 @@ const App: React.FC = () => {
   if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-stone-50">
-        <Loader2 className="w-10 h-10 animate-spin text-stone-300" />
+        <Loader2 className="w-10 h-10 animate-spin text-stone-600" />
       </div>
     );
   }
@@ -892,21 +880,14 @@ const App: React.FC = () => {
       const def = await purchaseBlindBox(user.id, unboxingTheme.id, creatorId, 100);
 
       let finalImageUrl = def.imageUrl;
+      let finalBase64: string | undefined;
       if (!finalImageUrl) {
         const themeToUse = unboxingTheme; // reuse existing full theme object
-        finalImageUrl = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, '1K');
+        const result = await generateCharacterImage(user.id, themeToUse.id, def, themeToUse.name, themeToUse.visualStyle, '1K');
+        finalImageUrl = result.url;
+        finalBase64 = result.base64;
       }
 
-      // Generate 360 video in background
-      generateCharacterVideo(user.id, unboxingTheme.id, def, unboxingTheme.name, unboxingTheme.visualStyle)
-        .then(url => {
-          console.log(`[App] 360 video generated for ${def.name}: ${url}`);
-          setState(prev => ({
-            ...prev,
-            collection: prev.collection.map(c => c.name === def.name && c.themeId === unboxingTheme.id ? { ...c, videoUrl: url } : c)
-          }));
-        })
-        .catch(err => console.warn(`[App] Video gen failed for ${def.name}:`, err));
 
       const newChar: Character = {
         id: Math.random().toString(36).substr(2, 9),
@@ -956,8 +937,8 @@ const App: React.FC = () => {
       <div className="fixed inset-0 z-[80] bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
         <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl scale-100 animate-in zoom-in-95 duration-300">
           <div className="text-center space-y-2 mb-8">
-            <h3 className="text-2xl font-black tracking-tight text-stone-900">Purchase Blind Boxes</h3>
-            <p className="text-stone-500 font-medium">{purchaseModalTheme.name}</p>
+            <h3 className="text-2xl font-black tracking-tight text-[#2a0029]">Purchase Blind Boxes</h3>
+            <p className="text-stone-700 font-medium">{purchaseModalTheme.name}</p>
           </div>
 
           <div className="flex items-center justify-center gap-6 mb-8">
@@ -969,8 +950,8 @@ const App: React.FC = () => {
             </button>
 
             <div className="flex flex-col items-center w-24">
-              <span className="text-4xl font-black text-stone-900">{purchaseQuantity}</span>
-              <span className="text-xs font-black uppercase text-stone-400 tracking-wider">BOXES</span>
+              <span className="text-4xl font-black text-[#2a0029]">{purchaseQuantity}</span>
+              <span className="text-xs font-black uppercase text-stone-700 tracking-wider">BOXES</span>
             </div>
 
             <button
@@ -992,7 +973,7 @@ const App: React.FC = () => {
 
             <button
               onClick={() => setPurchaseModalTheme(null)}
-              className="w-full bg-white text-stone-400 py-3 rounded-2xl font-black text-sm hover:bg-stone-50 transition-colors"
+              className="w-full bg-white text-stone-700 py-3 rounded-2xl font-black text-sm hover:bg-stone-50 transition-colors"
             >
               Cancel
             </button>
@@ -1003,7 +984,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-32 bg-[#faf9f6] text-stone-900">
+    <div className="min-h-screen pb-32 bg-gradient-to-br from-[#f3e8ff] via-[#e9d5ff] to-[#f8f0ff] text-[#2a0029]">
       {loading && renderLoading()}
       {renderPurchaseModal()}
       {renderGlobalError()}
@@ -1043,20 +1024,22 @@ const App: React.FC = () => {
       />}
 
       <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-stone-100 px-8 py-5 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('marketplace')}>
-          <div className="bg-stone-900 p-1.5 rounded-xl text-white"><ShoppingBag className="w-5 h-5" /></div>
-          <h1 className="text-2xl font-black tracking-tighter">yumi.</h1>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('marketplace')}>
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm flex items-center justify-center bg-white border border-stone-100 p-1.5">
+            <img src="/yumi-logo.png" alt="yumi" className="w-full h-full object-contain" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tighter text-[#2a0029]">yumi.</h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="bg-stone-50 px-5 py-2.5 rounded-full flex items-center gap-3 border border-stone-100 shadow-inner">
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black uppercase text-stone-400 leading-none">Studio</span>
-              <span className="font-black text-stone-900 text-sm leading-none">{user?.studioName || 'Guest'}</span>
+              <span className="text-[10px] font-black uppercase text-stone-600 leading-none">Studio</span>
+              <span className="font-black text-[#2a0029] text-sm leading-none">{user?.studioName || 'Guest'}</span>
             </div>
             <div className="w-px h-4 bg-stone-200" />
             <div className="flex items-center gap-1.5">
               <Coins className="w-4 h-4 text-emerald-500" />
-              <span className="font-black text-stone-900 text-sm">{state.coins}</span>
+              <span className="font-black text-[#2a0029] text-sm">{state.coins}</span>
             </div>
           </div>
           <button
@@ -1086,8 +1069,8 @@ const App: React.FC = () => {
               {showProfileDropdown && (
                 <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-stone-100 w-48 overflow-hidden z-50">
                   <div className="p-4 border-b border-stone-100">
-                    <p className="font-bold text-sm text-stone-900 truncate">{user.name}</p>
-                    <p className="text-[10px] text-stone-400 truncate">{user.email}</p>
+                    <p className="font-bold text-sm text-[#2a0029] truncate">{user.name}</p>
+                    <p className="text-[10px] text-stone-600 truncate">{user.email}</p>
                   </div>
                   {isUserAdmin && (
                     <button
@@ -1115,7 +1098,7 @@ const App: React.FC = () => {
               )}
             </div>
           )}
-          <button onClick={handleApiKeyPrompt} className={`p-2.5 rounded-full transition-all ${apiKeySelected ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}>
+          <button onClick={handleApiKeyPrompt} className={`p-2.5 rounded-full transition-all ${apiKeySelected ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
             <Settings className="w-5 h-5" />
           </button>
         </div>
@@ -1127,11 +1110,11 @@ const App: React.FC = () => {
             <section className="bg-stone-900 rounded-[3.5rem] p-20 text-white relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-white/10 to-transparent pointer-events-none"></div>
               <div className="relative z-10 max-w-2xl">
-                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-400 mb-6 block">Production Lab</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.4em] text-emerald-400 mb-6 block">Production Lab</span>
                 <h2 className="text-7xl font-black mb-8 tracking-tighter leading-[0.9]">Create your universe.</h2>
-                <p className="text-stone-400 text-xl mb-12 leading-relaxed font-light">Input a theme, and watch as we generate a full mystery series including packaging and unique characters.</p>
+                <p className="text-white text-lg mb-12 leading-relaxed font-light">Input a theme, and watch as we generate a full mystery series including packaging and unique characters.</p>
                 <div className="flex flex-wrap gap-5">
-                  <button onClick={() => setView('studio-initial')} className="bg-white text-stone-900 px-12 py-6 rounded-[2rem] font-black text-lg hover:bg-stone-100 transition-all shadow-2xl flex items-center gap-3 active:scale-95">
+                  <button onClick={() => setView('studio-initial')} className="bg-white text-[#2a0029] px-12 py-6 rounded-[2rem] font-black text-lg hover:bg-stone-100 transition-all shadow-2xl flex items-center gap-3 active:scale-95">
                     <PlusCircle className="w-6 h-6" /> Create Collection
                   </button>
                 </div>
@@ -1140,19 +1123,19 @@ const App: React.FC = () => {
 
             <div className="space-y-16 animate-in fade-in zoom-in duration-700">
               <div className="text-center space-y-4">
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 block">World Market</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-500 block">World Market</span>
                 <h2 className="text-6xl font-black tracking-tighter">Community Collections</h2>
 
                 {/* Search and Filter Panel */}
                 <div className="flex flex-wrap items-center justify-center gap-4 pt-4 max-w-2xl mx-auto">
                   <div className="relative flex-1 min-w-[200px] group">
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-300 group-focus-within:text-stone-900 transition-colors" />
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-600 group-focus-within:text-[#2a0029] transition-colors" />
                     <input
                       type="text"
                       placeholder="Search collections..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full bg-white border-2 border-stone-100 rounded-full pl-14 pr-6 py-4 font-bold text-sm outline-none focus:border-stone-900 text-stone-900 transition-all shadow-sm placeholder:text-stone-300"
+                      className="w-full bg-white border-2 border-stone-100 rounded-full pl-14 pr-6 py-4 font-bold text-sm outline-none focus:border-stone-900 text-[#2a0029] transition-all shadow-sm placeholder:text-stone-600"
                     />
                   </div>
 
@@ -1160,7 +1143,7 @@ const App: React.FC = () => {
                     <select
                       value={filterCreator}
                       onChange={(e) => setFilterCreator(e.target.value)}
-                      className="w-full appearance-none bg-white border-2 border-stone-100 rounded-full pl-6 pr-12 py-4 font-bold text-sm outline-none focus:border-stone-900 text-stone-900 transition-all shadow-sm cursor-pointer"
+                      className="w-full appearance-none bg-white border-2 border-stone-100 rounded-full pl-6 pr-12 py-4 font-bold text-sm outline-none focus:border-stone-900 text-[#2a0029] transition-all shadow-sm cursor-pointer"
                     >
                       <option value="">All Design Studios</option>
                       {Array.from(new Set(state.publicThemes.map(t => {
@@ -1173,7 +1156,7 @@ const App: React.FC = () => {
                         <option key={creator} value={creator}>{creator}</option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300 pointer-events-none" />
+                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-600 pointer-events-none" />
                   </div>
                 </div>
               </div>
@@ -1238,7 +1221,7 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Production Suite Active</span>
               </div>
               <h2 className="text-7xl font-black tracking-tighter leading-[0.9]">Crafting "{state.currentTheme.name}"</h2>
-              <p className="text-stone-400 text-xl font-light max-w-2xl mx-auto leading-relaxed">
+              <p className="text-stone-700 text-xl font-light max-w-2xl mx-auto leading-relaxed">
                 The Lab is generating your series figurines. Please wait for the production cycle to complete.
               </p>
             </div>
@@ -1255,7 +1238,7 @@ const App: React.FC = () => {
                     <div className="absolute top-6 right-8">
                       <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${isDone ? 'bg-emerald-50 text-emerald-500' :
                         isBuilding ? 'bg-amber-50 text-amber-500 animate-pulse' :
-                          'bg-stone-50 text-stone-300'
+                          'bg-stone-50 text-stone-600'
                         }`}>
                         {isDone ? 'Completed' : isBuilding ? 'Building...' : 'Pending'}
                       </span>
@@ -1275,10 +1258,10 @@ const App: React.FC = () => {
                       )}
                     </div>
 
-                    <h3 className={`text-2xl font-black tracking-tight mb-2 transition-colors duration-500 ${isDone ? 'text-stone-900' : 'text-stone-300'}`}>
+                    <h3 className={`text-2xl font-bold tracking-tight mb-2 transition-colors duration-500 ${isDone ? 'text-[#2a0029]' : 'text-stone-600'}`}>
                       {char.name}
                     </h3>
-                    <p className={`text-sm leading-relaxed transition-colors duration-500 line-clamp-2 ${isDone ? 'text-stone-500' : 'text-stone-300'}`}>
+                    <p className={`text-sm leading-relaxed transition-colors duration-500 line-clamp-2 ${isDone ? 'text-stone-700' : 'text-stone-600'}`}>
                       {isDone ? char.description : "Awaiting production cycle..."}
                     </p>
                   </div>
@@ -1295,7 +1278,7 @@ const App: React.FC = () => {
                   <CheckCircle2 className="w-6 h-6 text-emerald-400 group-hover:scale-125 transition-transform" />
                   View in Marketplace
                 </button>
-                <p className="mt-6 text-stone-400 font-bold uppercase tracking-widest text-[10px]">Production Run Successful</p>
+                <p className="mt-6 text-stone-700 font-medium uppercase tracking-widest text-[9px]">Production Run Successful</p>
               </div>
             )}
           </div>
@@ -1316,7 +1299,7 @@ const App: React.FC = () => {
             <h2 className="text-6xl font-black tracking-tighter mb-10">Your Collection.</h2>
             {state.collection.length === 0 ? (
               <div className="text-center py-40 bg-white rounded-[4rem] border-2 border-dashed border-stone-100 w-full">
-                <p className="text-stone-400 text-xl font-light">Your shelf is empty. Start unboxing!</p>
+                <p className="text-stone-700 text-xl font-light">Your shelf is empty. Start unboxing!</p>
               </div>
             ) : (
               <div className="space-y-10 w-full max-w-5xl">
@@ -1365,7 +1348,7 @@ const App: React.FC = () => {
 
           return (
             <div className="space-y-8 animate-in slide-in-from-bottom-12 duration-700">
-              <button onClick={() => setView('collection')} className="flex items-center gap-2 text-stone-400 font-bold hover:text-stone-900 transition-colors">
+              <button onClick={() => setView('collection')} className="flex items-center gap-2 text-stone-700 font-bold hover:text-[#2a0029] transition-colors">
                 <ChevronLeft className="w-5 h-5" /> Back to Shelf
               </button>
 
@@ -1374,11 +1357,7 @@ const App: React.FC = () => {
                 <div className="lg:col-span-2">
                   <div className="bg-white rounded-[3rem] p-8 shadow-2xl border border-stone-50 sticky top-8">
                     <div className="aspect-square rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-stone-50 to-stone-100 mb-6 shadow-inner border border-stone-100 relative group">
-                      {state.activeCharacter.videoUrl ? (
-                        <video src={state.activeCharacter.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={state.activeCharacter.imageUrl} alt={state.activeCharacter.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                      )}
+                      <img src={state.activeCharacter.imageUrl} alt={state.activeCharacter.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                       <div className="absolute top-4 right-4 z-10">
                         <span className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${state.activeCharacter.rarity === 'Legendary' ? 'bg-gradient-to-r from-rose-500 to-purple-600 text-white' :
                           state.activeCharacter.rarity === 'Rare' ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white' :
@@ -1392,12 +1371,12 @@ const App: React.FC = () => {
                     {/* Quick Stats */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-stone-50 rounded-2xl p-4 text-center">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">Obtained</p>
-                        <p className="text-sm font-bold text-stone-900">{obtainedDate}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-700 mb-1">Obtained</p>
+                        <p className="text-sm font-bold text-[#2a0029]">{obtainedDate}</p>
                       </div>
                       <div className="bg-stone-50 rounded-2xl p-4 text-center">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">Copies</p>
-                        <p className="text-sm font-bold text-stone-900">{state.activeCharacter.count || 1}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-700 mb-1">Copies</p>
+                        <p className="text-sm font-bold text-[#2a0029]">{state.activeCharacter.count || 1}</p>
                       </div>
                     </div>
                   </div>
@@ -1408,9 +1387,9 @@ const App: React.FC = () => {
                   {/* Name & Description */}
                   <div className="bg-white rounded-[3rem] p-8 shadow-2xl border border-stone-50">
                     <div className="mb-6">
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-2 block">Character Profile</span>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-500 mb-2 block">Character Profile</span>
                       <h1 className="text-5xl font-black tracking-tight mb-2">{state.activeCharacter.name}</h1>
-                      <p className="text-stone-400 text-sm font-medium">{state.activeCharacter.theme}</p>
+                      <p className="text-stone-700 text-sm font-medium">{state.activeCharacter.theme}</p>
                     </div>
                     <div className="bg-stone-50 rounded-[2rem] p-6 border border-stone-100">
                       <p className="text-stone-600 leading-relaxed">{state.activeCharacter.description}</p>
@@ -1420,7 +1399,7 @@ const App: React.FC = () => {
                   {/* Related Characters */}
                   {relatedChars.length > 0 && (
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl border border-stone-50">
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-6">From Same Series ({relatedChars.length})</h3>
+                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-stone-700 mb-6">From Same Series ({relatedChars.length})</h3>
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                         {relatedChars.slice(0, 10).map((char) => (
                           <div
@@ -1465,20 +1444,20 @@ const App: React.FC = () => {
             <div className="flex flex-col items-center text-center space-y-6">
               <button
                 onClick={() => setView('marketplace')}
-                className="flex items-center gap-2 text-stone-400 font-bold hover:text-stone-900 transition-colors bg-white px-6 py-3 rounded-full border border-stone-100 shadow-sm"
+                className="flex items-center gap-2 text-[#2a0029] font-black hover:opacity-80 transition-opacity bg-white px-6 py-3 rounded-full border border-stone-100 shadow-sm"
               >
-                <ChevronLeft className="w-5 h-5" /> Back to Market
+                <ChevronLeft className="w-5 h-5" /> Back to Lobby
               </button>
               <div className="pt-8 mb-10">
                 <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-4 block">Official Series Set</span>
                 <h2 className="text-7xl font-black tracking-tighter mb-4">{state.currentTheme.name}</h2>
-                <p className="text-stone-400 text-xl font-light max-w-2xl mx-auto leading-relaxed">{state.currentTheme.description}</p>
+                <p className="text-stone-700 text-xl font-light max-w-2xl mx-auto leading-relaxed">{state.currentTheme.description}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto items-start">
-              {/* Left: Box Art */}
-              <div className="sticky top-10 flex justify-center lg:justify-end">
+              {/* Left: Box Art & Title */}
+              <div className="sticky top-10 flex flex-col items-center gap-6">
                 <div className="bg-white rounded-[4rem] p-8 shadow-2xl border border-stone-50 flex items-center justify-center aspect-square relative overflow-hidden group max-w-[420px] w-full">
                   <div className="absolute inset-0 bg-gradient-to-br from-stone-50/50 to-transparent" />
                   <img
@@ -1486,10 +1465,10 @@ const App: React.FC = () => {
                     alt={state.currentTheme.name}
                     className="w-full h-full object-contain relative z-10 transition-transform duration-700 group-hover:scale-110"
                   />
-                  <div className="absolute bottom-10 inset-x-0 text-center z-20">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-stone-300 mb-2">Mystery Series</p>
-                    <h3 className="text-2xl font-black tracking-tight">{state.currentTheme.name}</h3>
-                  </div>
+                </div>
+                <div className="text-center px-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-stone-600 mb-2">Mystery Series</p>
+                  <h3 className="text-3xl font-black tracking-tighter text-[#2a0029] leading-tight">{state.currentTheme.name}</h3>
                 </div>
               </div>
 
@@ -1536,7 +1515,7 @@ const App: React.FC = () => {
                           ) : (
                             <div className="flex flex-col items-center gap-2">
                               <Package className="w-6 h-6 text-stone-200" />
-                              <span className="text-[7px] font-black uppercase tracking-widest text-stone-300">Classified</span>
+                              <span className="text-[7px] font-black uppercase tracking-widest text-stone-600">Classified</span>
                             </div>
                           )}
 
@@ -1548,7 +1527,7 @@ const App: React.FC = () => {
 
                         {char?.name && (
                           <div className="px-2 text-center">
-                            <p className={`text-[10px] font-black tracking-tight truncate mb-0.5 ${isMystery ? 'text-stone-300' : 'text-stone-900'}`}>
+                            <p className={`text-[10px] font-black tracking-tight truncate mb-0.5 ${isMystery ? 'text-stone-600' : 'text-[#2a0029]'}`}>
                               {isMystery ? '???' : char.name}
                             </p>
                             <p className={`text-[8px] font-black uppercase tracking-widest ${char.rarity === 'Legendary' ? 'text-rose-500' :
@@ -1581,16 +1560,16 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-3xl border border-stone-200/40 px-10 py-6 flex items-center gap-14 z-40 rounded-[3.5rem] shadow-2xl transition-all duration-700 hover:scale-105">
-        <button onClick={() => setView('marketplace')} className={`flex flex-col items-center gap-2 transition-all ${view === 'marketplace' ? 'text-stone-900' : 'text-stone-300'}`}>
+      <nav className="fixed bottom-10 left-10 bg-white border-2 border-stone-200 px-6 py-10 flex flex-col items-center gap-10 z-[100] rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] transition-all duration-700 hover:scale-105">
+        <button onClick={() => setView('marketplace')} className={`flex flex-col items-center gap-2 transition-all ${view === 'marketplace' ? 'text-[#2a0029]' : 'text-stone-600'}`}>
           <Store className="w-7 h-7" />
           <span className="text-[9px] font-black uppercase">Shop</span>
         </button>
-        <button onClick={() => setView('studio-initial')} className={`flex flex-col items-center gap-2 transition-all ${view.startsWith('studio') ? 'text-emerald-600' : 'text-stone-300'}`}>
+        <button onClick={() => setView('studio-initial')} className={`flex flex-col items-center gap-2 transition-all ${view.startsWith('studio') ? 'text-emerald-600' : 'text-stone-600'}`}>
           <Wand2 className="w-7 h-7" />
           <span className="text-[9px] font-black uppercase">Studio</span>
         </button>
-        <button onClick={() => setView('collection')} className={`flex flex-col items-center gap-2 transition-all ${view === 'collection' ? 'text-stone-900' : 'text-stone-300'}`}>
+        <button onClick={() => setView('collection')} className={`flex flex-col items-center gap-2 transition-all ${view === 'collection' ? 'text-[#2a0029]' : 'text-stone-600'}`}>
           <LayoutGrid className="w-7 h-7" />
           <span className="text-[9px] font-black uppercase">Shelf</span>
         </button>

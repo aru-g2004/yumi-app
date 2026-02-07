@@ -14,12 +14,12 @@ const Login: React.FC = () => {
 
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-stone-50 space-y-8 animate-in fade-in zoom-in duration-1000">
-            <div className="w-24 h-24 bg-stone-900 rounded-[2rem] flex items-center justify-center shadow-2xl">
-                <Sparkles className="w-10 h-10 text-emerald-400" />
+            <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl overflow-hidden border border-stone-100 p-4">
+                <img src="/yumi-logo.png" alt="yumi" className="w-full h-full object-contain" />
             </div>
             <div className="text-center space-y-2">
-                <h1 className="text-4xl font-black tracking-tighter">yumi.</h1>
-                <p className="text-stone-400 font-bold uppercase tracking-widest text-xs">Your universe of collectibles</p>
+                <h1 className="text-4xl font-black tracking-tighter text-[#2a0029]">yumi.</h1>
+                <p className="text-stone-500 font-bold uppercase tracking-widest text-xs">Your universe of collectibles</p>
             </div>
             <button
                 onClick={handleGoogleLogin}

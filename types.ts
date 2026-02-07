@@ -15,7 +15,6 @@ export interface Character {
   description: string;
   rarity: 'Common' | 'Rare' | 'Legendary';
   imageUrl: string;
-  videoUrl?: string;
   theme: string;
   themeId: string;
   themeCreatorId: string;
